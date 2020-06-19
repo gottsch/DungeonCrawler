@@ -5,6 +5,9 @@ package com.someguyssoftware.dungoncrawler.visualizer;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+
+import com.someguyssoftware.dungoncrawler.generator.CaveLevelGenerator;
 
 import javafx.application.Application;
 import javafx.event.ActionEvent;
@@ -52,8 +55,13 @@ public class CaveVisualizer extends Application {
     	HBox mapBox = new HBox();
     	VBox inputBox = new VBox();
 
+    	// TEMP 
+    	CaveLevelGenerator caveGen = new CaveLevelGenerator();
+    	map = caveGen.createMap(96, 96, new Random());
+    	
+    	// TODO all controls need to be aware of all other controls... separating into multiple methods might not be a good idea.
     	buildInputPane(inputBox);
-    	buildMapPane(mapBox);
+    	buildMapPane(mapBox, map);
     	mainBox.getChildren().addAll(inputBox, mapBox);
     	
     	Scene scene = new Scene(mainBox);
@@ -62,8 +70,8 @@ public class CaveVisualizer extends Application {
     	// display the application
     	stage.show();
     	
-    	Group group = (Group) mapBox.getChildren().get(0);
-    	group.getChildren().clear();
+//    	Group group = (Group) mapBox.getChildren().get(0);
+//    	group.getChildren().clear();
 
 		
 	}
@@ -72,7 +80,7 @@ public class CaveVisualizer extends Application {
 	 * 
 	 * @param mapBox
 	 */
-	public void buildMapPane(HBox mapBox /* TODO add map data */) {
+	public void buildMapPane(HBox mapBox, boolean[][] map/*, context*/) {
 		// clear any children
 		mapBox.getChildren().clear();
 		
@@ -90,10 +98,15 @@ public class CaveVisualizer extends Application {
 		int startX = 0;
 		int startY = 0;
 		
-		for (int x = 0; x < 96; x++) {
-			for (int y = 0; y < 96; y++) {
+		for (int x = 0; x < map.length; x++) {
+			for (int y = 0; y < map[x].length; y++) {
 				Rectangle tile = new Rectangle(startX + (x * tileWidth), startY + (y * tileHeight), tileWidth, tileHeight);
-				tile.setFill(Color.DARKGREY);
+				if (map[x][y]) {
+					tile.setFill(Color.DARKGREY);
+				}
+				else {
+					tile.setFill(Color.DARKBLUE);
+				}
 				tile.setStroke(Color.BLACK);
 				group.getChildren().add(tile);
 			}
