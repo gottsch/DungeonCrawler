@@ -10,6 +10,7 @@ import java.util.Random;
 import com.someguyssoftware.dungoncrawler.generator.CaveLevelGenerator;
 
 import javafx.application.Application;
+import javafx.beans.binding.MapBinding;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
@@ -32,6 +33,8 @@ import javafx.stage.Stage;
  */
 public class CaveVisualizer extends Application {
 
+	private CaveLevelGenerator caveGen = new CaveLevelGenerator();
+	private Random random = new Random();
 	private boolean[][] map;
 	
 	/**
@@ -56,12 +59,11 @@ public class CaveVisualizer extends Application {
     	VBox inputBox = new VBox();
 
     	// TEMP 
-    	CaveLevelGenerator caveGen = new CaveLevelGenerator();
-    	map = caveGen.createMap(96, 96, new Random());
+    	map = caveGen.initMap(96, 96, new Random());
     	
     	// TODO all controls need to be aware of all other controls... separating into multiple methods might not be a good idea.
-    	buildInputPane(inputBox);
-    	buildMapPane(mapBox, map);
+    	buildInputPane(inputBox, mapBox);
+//    	buildMapPane(mapBox, map);
     	mainBox.getChildren().addAll(inputBox, mapBox);
     	
     	Scene scene = new Scene(mainBox);
@@ -122,7 +124,7 @@ public class CaveVisualizer extends Application {
 	 * 
 	 * @param pane
 	 */
-	public void buildInputPane(VBox pane) {
+	public void buildInputPane(VBox pane, HBox mapBox) {
     	pane.setPadding(new Insets(5, 5, 5, 5));
     	
     	List<Label> labels = new ArrayList<>();
@@ -168,7 +170,10 @@ public class CaveVisualizer extends Application {
     	
     	newButton.setOnAction(new EventHandler<ActionEvent>() {
     	    @Override public void handle(ActionEvent e) {
-    	        // TODO clear current map and restart
+    	        // TODO get the sizes from the inputs
+    	    	// TODO update caveGen with input values ie caveGen.withGrowthLimit() etc.
+    	    	map = caveGen.initMap(96, 96, random);
+    	    	buildMapPane(mapBox, map);
     	    }
     	});
     	

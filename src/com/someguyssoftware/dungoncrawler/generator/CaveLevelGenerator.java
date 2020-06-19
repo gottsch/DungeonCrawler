@@ -10,10 +10,9 @@ import java.util.Random;
  *
  */
 public class CaveLevelGenerator implements ILevelGenerator {
-	// TODO these value either become constant defaults or go away
-	float chanceToStartAlive = 0.4f;
-	int growthLimit = 4;
-	int decayLimit =3;
+	private float chanceToStartAlive = 0.4f;
+	private int growthLimit = 4;
+	private int decayLimit =3;
 
 	/**
 	 * 
@@ -22,7 +21,7 @@ public class CaveLevelGenerator implements ILevelGenerator {
 	 * @param random
 	 * @return
 	 */
-	public boolean[][] createMap(int width, int height, Random random) {
+	public boolean[][] initMap(int width, int height, Random random) {
 		boolean[][] map = new boolean[width][height];
 		for (int x = 0; x < width; x++) {
 			for (int y = 0; y < height; y++) {
