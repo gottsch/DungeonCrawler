@@ -10,10 +10,31 @@ import java.util.Random;
  *
  */
 public class CaveLevelGenerator implements ILevelGenerator {
-	private float chanceToStartAlive = 0.4f;
+	private float chanceToStartSolid = 0.4f;
 	private int growthLimit = 4;
-	private int decayLimit =3;
+	private int decayLimit = 3;
+	private int width = 96;
+	private int height = 96;
+	private int iterations = 2;
 
+	public boolean[][] build() {
+		Random random = new Random();
+		boolean[][] map = initMap(random);
+		for (int stepIndex = 0; stepIndex < iterations; stepIndex++) {
+			map = process(map);
+		}
+		return map;
+	}
+	
+	/**
+	 * 
+	 * @param random
+	 * @return
+	 */
+	private boolean[][] initMap(Random random) {
+		return initMap(width, height, random);
+	}
+	
 	/**
 	 * 
 	 * @param width
@@ -21,11 +42,12 @@ public class CaveLevelGenerator implements ILevelGenerator {
 	 * @param random
 	 * @return
 	 */
+	// TODO make private
 	public boolean[][] initMap(int width, int height, Random random) {
 		boolean[][] map = new boolean[width][height];
 		for (int x = 0; x < width; x++) {
 			for (int y = 0; y < height; y++) {
-				if (random.nextDouble() < chanceToStartAlive) {
+				if (random.nextDouble() < chanceToStartSolid) {
 					map[x][y] = true;
 				}
 			}
@@ -38,26 +60,27 @@ public class CaveLevelGenerator implements ILevelGenerator {
 	 * @param oldMap
 	 * @return
 	 */
-	public boolean[][] doSimulationStep(boolean[][] oldMap) {
+	public boolean[][] process(boolean[][] oldMap) {
 		boolean[][] newMap = new boolean[oldMap.length][oldMap[0].length];
-		// Loop over each row and column of the map
+		// loop over each row and column of the map
 		for (int x = 0; x < oldMap.length; x++) {
 			for (int y = 0; y < oldMap[0].length; y++) {
-				int nbs = countAliveNeighbours(oldMap, x, y);
-				// The new value is based on our simulation rules
-				// First, if a cell is alive (solid | non-cave) but has too few neighbours, kill it.
+				int nbs = countSolidNeighbours(oldMap, x, y);
+				// the new value is based on our simulation rules
+				// first, if a cell is solid but has too few neighbours, decay it.
 				if (oldMap[x][y]) {
 					if (nbs < decayLimit) {
 						newMap[x][y] = false;
-					} else {
+					} 
+					else {
 						newMap[x][y] = true;
 					}
-				} // Otherwise, if the cell is dead now, check if it has the right number of
-					// neighbours to be 'born'
+				} // otherwise, if the cell is empty now, check if it has the right number of neighbours to grow
 				else {
 					if (nbs > growthLimit) {
 						newMap[x][y] = true;
-					} else {
+					}
+					else {
 						newMap[x][y] = false;
 					}
 				}
@@ -67,29 +90,83 @@ public class CaveLevelGenerator implements ILevelGenerator {
 	}
 
 	/*
-	 * Returns the number of cells in a ring around (x,y) that are alive.
+	 * Returns the number of cells in a ring around (x,y) that are solid.
 	 */
-	public int countAliveNeighbours(boolean[][] map, int x, int y) {
+	private int countSolidNeighbours(boolean[][] map, int x, int y) {
 		int count = 0;
 		for (int i = -1; i < 2; i++) {
 			for (int j = -1; j < 2; j++) {
 				int neighbourX = x + i;
 				int neighbourY = y + j;
-				// If we're looking at the middle point
+				// if processing the original index
 				if (i == 0 && j == 0) {
-					// Do nothing, we don't want to add ourselves in!
+					// do nothing
 					continue;
 				}
-				// In case the index we're looking at it off the edge of the map
+				// in case the index we're looking at it off the edge of the map, treat as solid
 				else if (neighbourX < 0 || neighbourY < 0 || neighbourX >= map.length || neighbourY >= map[0].length) {
 					count = count + 1;
 				}
-				// Otherwise, a normal check of the neighbour
+				// else, a normal check of the neighbour
 				else if (map[neighbourX][neighbourY]) {
 					count = count + 1;
 				}
 			}
 		}
 		return count;
+	}
+
+	public float getChanceToStartSolid() {
+		return chanceToStartSolid;
+	}
+
+	public int getGrowthLimit() {
+		return growthLimit;
+	}
+
+	public int getDecayLimit() {
+		return decayLimit;
+	}
+
+	public int getWidth() {
+		return width;
+	}
+	
+	public int getHeight() {
+		return height;
+	}
+	
+	public int getIterations() {
+		return iterations;
+	}
+	
+	public CaveLevelGenerator withChanceToStartSolid(float chance) {
+		this.chanceToStartSolid = chance;
+		return this;
+	}
+
+	public CaveLevelGenerator withGrowthLimit(int limit) {
+		this.growthLimit = limit;
+		return this;
+	}
+
+	public CaveLevelGenerator withDecayLimit(int limit) {
+		this.decayLimit = limit;
+		return this;
+	}
+	
+	public CaveLevelGenerator withWidth(int width) {
+		this.width = width;
+		return this;
+	}
+	
+	public CaveLevelGenerator withHeight(int height) {
+		this.height = height;
+		return this;
+	}
+	
+	public CaveLevelGenerator withIterations(int iterations) {
+		this.iterations = iterations;
+		return this;
 	}
 }

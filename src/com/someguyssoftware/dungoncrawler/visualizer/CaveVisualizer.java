@@ -51,19 +51,14 @@ public class CaveVisualizer extends Application {
 	public void start(Stage stage) throws Exception {
 		// setup the stage
 		stage.setWidth(700);
-		stage.setHeight(520);
+		stage.setHeight(530);
     	stage.setTitle("Cave Visualizer");
     	
     	HBox mainBox = new HBox();
     	HBox mapBox = new HBox();
     	VBox inputBox = new VBox();
-
-    	// TEMP 
-    	map = caveGen.initMap(96, 96, new Random());
     	
-    	// TODO all controls need to be aware of all other controls... separating into multiple methods might not be a good idea.
-    	buildInputPane(inputBox, mapBox);
-//    	buildMapPane(mapBox, map);
+     	buildInputPane(inputBox, mapBox);
     	mainBox.getChildren().addAll(inputBox, mapBox);
     	
     	Scene scene = new Scene(mainBox);
@@ -71,18 +66,13 @@ public class CaveVisualizer extends Application {
     	
     	// display the application
     	stage.show();
-    	
-//    	Group group = (Group) mapBox.getChildren().get(0);
-//    	group.getChildren().clear();
-
-		
-	}
+    }
 
 	/**
 	 * 
 	 * @param mapBox
 	 */
-	public void buildMapPane(HBox mapBox, boolean[][] map/*, context*/) {
+	public void buildMapPane(HBox mapBox, boolean[][] map) {
 		// clear any children
 		mapBox.getChildren().clear();
 		
@@ -94,7 +84,7 @@ public class CaveVisualizer extends Application {
 		bg.setFill(Color.BLACK);
 		group.getChildren().add(bg);
 		
-		// TEMP add tiles
+		// add tiles
 		int tileWidth = 5;
 		int tileHeight = 5;
 		int startX = 0;
@@ -130,6 +120,21 @@ public class CaveVisualizer extends Application {
     	List<Label> labels = new ArrayList<>();
     	List<TextField> fields = new ArrayList<>();
     	List<HBox> hBoxes = new ArrayList<>();
+    	
+    	// dimensions
+    	Label widthLabel = new Label("Width:");
+    	TextField widthField = new TextField("96");
+    	HBox widthBox = new HBox(widthLabel, widthField);
+    	labels.add(widthLabel);
+    	fields.add(widthField);
+    	hBoxes.add(widthBox);
+    	
+    	Label heightLabel = new Label("Height:");
+    	TextField heightField = new TextField("96");
+    	HBox heightBox = new HBox(heightLabel, heightField);
+    	labels.add(heightLabel);
+    	fields.add(heightField);
+    	hBoxes.add(heightBox);
     	
     	// growth limit
     	Label growthLimitLabel = new Label("Growth Limit:");
@@ -170,18 +175,27 @@ public class CaveVisualizer extends Application {
     	
     	newButton.setOnAction(new EventHandler<ActionEvent>() {
     	    @Override public void handle(ActionEvent e) {
-    	        // TODO get the sizes from the inputs
-    	    	// TODO update caveGen with input values ie caveGen.withGrowthLimit() etc.
-    	    	map = caveGen.initMap(96, 96, random);
+    	    	map = caveGen.initMap(Integer.parseInt(widthField.getText()), Integer.parseInt(heightField.getText()), random);
+    	    	map = caveGen
+    	    			.withChanceToStartSolid(new Float(initialChanceField.getText()))
+    	    			.withDecayLimit(new Integer(decayLimitField.getText()))
+    	    			.withGrowthLimit(new Integer(growthLimitField.getText()))
+    	    			.withIterations(new Integer(iterationsField.getText()))
+    	    			.withWidth(new Integer(widthField.getText()))
+    	    			.withHeight(new Integer(heightField.getText()))
+    	    			.build();
+    	    	
     	    	buildMapPane(mapBox, map);
     	    }
     	});
     	
     	iterationButton.setOnAction(new EventHandler<ActionEvent>() {
     	    @Override public void handle(ActionEvent e) {
-    	        // TODO run another iteration against current map
+    	    	map = caveGen.process(map);
+    	    	buildMapPane(mapBox, map);
     	    }
     	});
+    	
     	buttonsBox.getChildren().addAll(newButton, iterationButton);
     	hBoxes.add(buttonsBox);
     	
@@ -202,7 +216,7 @@ public class CaveVisualizer extends Application {
     		box.setSpacing(5);
     	}
     	
-    	pane.getChildren().addAll(growthLimitBox, decayLimitBox, initialChanceBox, iterationsBox, buttonsBox);
+    	pane.getChildren().addAll(widthBox, heightBox, growthLimitBox, decayLimitBox, initialChanceBox, iterationsBox, buttonsBox);
 	}
 
 }

@@ -27,7 +27,7 @@ public class Crawl {
 		Random random = new Random();
 		boolean[][] map = builder.initMap(100, 100, random);
 		for (int stepIndex = 0; stepIndex < 5; stepIndex++) {
-			map = builder.doSimulationStep(map);
+			map = builder.process(map);
 		}
 		
 		// TODO add visuals
