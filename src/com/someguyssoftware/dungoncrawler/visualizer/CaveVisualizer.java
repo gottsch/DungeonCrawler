@@ -7,10 +7,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import com.someguyssoftware.dungoncrawler.generator.CaveLevelGenerator;
+import com.someguyssoftware.dungoncrawler.generator.cave.CaveLevel;
+import com.someguyssoftware.dungoncrawler.generator.cave.CaveLevelGenerator;
 
 import javafx.application.Application;
-import javafx.beans.binding.MapBinding;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
@@ -20,7 +20,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
@@ -35,7 +34,7 @@ public class CaveVisualizer extends Application {
 
 	private CaveLevelGenerator caveGen = new CaveLevelGenerator();
 	private Random random = new Random();
-	private boolean[][] map;
+	private CaveLevel level;
 	
 	/**
 	 * @param args
@@ -72,7 +71,7 @@ public class CaveVisualizer extends Application {
 	 * 
 	 * @param mapBox
 	 */
-	public void buildMapPane(HBox mapBox, boolean[][] map) {
+	public void buildMapPane(HBox mapBox, CaveLevel level) {
 		// clear any children
 		mapBox.getChildren().clear();
 		
@@ -90,14 +89,25 @@ public class CaveVisualizer extends Application {
 		int startX = 0;
 		int startY = 0;
 		
-		for (int x = 0; x < map.length; x++) {
-			for (int y = 0; y < map[x].length; y++) {
+		for (int x = 0; x < level.getCellMap().length; x++) {
+			for (int y = 0; y < level.getCellMap()[x].length; y++) {
 				Rectangle tile = new Rectangle(startX + (x * tileWidth), startY + (y * tileHeight), tileWidth, tileHeight);
-				if (map[x][y]) {
+				if (level.getCellMap()[x][y]) {
 					tile.setFill(Color.DARKGREY);
 				}
 				else {
-					tile.setFill(Color.DARKBLUE);
+					if (level.getIdMap()[x][y] == 1) {
+						tile.setFill(Color.LIGHTPINK);
+					}
+					else if (level.getIdMap()[x][y] == 2) {
+						tile.setFill(Color.GREEN);
+					}
+					else if (level.getIdMap()[x][y] == 3) {
+						tile.setFill(Color.DEEPPINK);
+					}
+					else {
+						tile.setFill(Color.DARKBLUE);
+					}
 				}
 				tile.setStroke(Color.BLACK);
 				group.getChildren().add(tile);
@@ -168,6 +178,22 @@ public class CaveVisualizer extends Application {
     	fields.add(iterationsField);
     	hBoxes.add(iterationsBox);
     	
+    	// smoothing
+    	Label smoothingLabel = new Label("Smoothing:");
+    	TextField smoothingField = new TextField("3");
+    	HBox smoothingBox = new HBox(smoothingLabel, smoothingField);
+    	labels.add(smoothingLabel);
+    	fields.add(smoothingField);
+    	hBoxes.add(smoothingBox);
+    	
+    	// fill
+    	Label fillLabel = new Label("Fill:");
+    	TextField fillField = new TextField("4");
+    	HBox fillBox = new HBox(fillLabel, fillField);
+    	labels.add(fillLabel);
+    	fields.add(fillField);
+    	hBoxes.add(fillBox);
+    	
     	// buttons
     	HBox buttonsBox = new HBox();
     	Button newButton = new Button("New Cave");
@@ -175,9 +201,10 @@ public class CaveVisualizer extends Application {
     	
     	newButton.setOnAction(new EventHandler<ActionEvent>() {
     	    @Override public void handle(ActionEvent e) {
-    	    	map = caveGen.initMap(Integer.parseInt(widthField.getText()), Integer.parseInt(heightField.getText()), random);
-    	    	map = caveGen
+    	    	level = (CaveLevel) caveGen
     	    			.withChanceToStartSolid(new Float(initialChanceField.getText()))
+    	    			.withSmoothing(new Integer(smoothingField.getText()))
+    	    			.withFill(new Integer(fillField.getText()))    	    	
     	    			.withDecayLimit(new Integer(decayLimitField.getText()))
     	    			.withGrowthLimit(new Integer(growthLimitField.getText()))
     	    			.withIterations(new Integer(iterationsField.getText()))
@@ -185,14 +212,16 @@ public class CaveVisualizer extends Application {
     	    			.withHeight(new Integer(heightField.getText()))
     	    			.build();
     	    	
-    	    	buildMapPane(mapBox, map);
+    	    	buildMapPane(mapBox, level);
     	    }
     	});
     	
     	iterationButton.setOnAction(new EventHandler<ActionEvent>() {
     	    @Override public void handle(ActionEvent e) {
-    	    	map = caveGen.process(map);
-    	    	buildMapPane(mapBox, map);
+    	    	boolean[][] map = caveGen.process(level.getCellMap());
+    	    	CaveLevel caveLevel = caveGen.findCaves(map);
+    	    	level = caveLevel;
+    	    	buildMapPane(mapBox, level);
     	    }
     	});
     	
@@ -216,7 +245,8 @@ public class CaveVisualizer extends Application {
     		box.setSpacing(5);
     	}
     	
-    	pane.getChildren().addAll(widthBox, heightBox, growthLimitBox, decayLimitBox, initialChanceBox, iterationsBox, buttonsBox);
+    	pane.getChildren().addAll(widthBox, heightBox, growthLimitBox, decayLimitBox, 
+    			initialChanceBox, iterationsBox, smoothingBox, fillBox, buttonsBox);
 	}
 
 }
