@@ -4,7 +4,9 @@
 package com.someguyssoftware.dungoncrawler.visualizer;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import com.someguyssoftware.dungoncrawler.generator.cave.CaveLevel;
@@ -26,7 +28,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 
 /**
- * @author Mark
+ * @author Mark Gottschling
  * Based on code from https://gamedevelopment.tutsplus.com/tutorials/generate-random-cave-levels-using-cellular-automata--gamedev-9664
  *
  */
@@ -89,6 +91,11 @@ public class CaveVisualizer extends Application {
 		int startX = 0;
 		int startY = 0;
 		
+		// map of caveID -> colors
+		Map<Integer, Color> caveColors = new HashMap<>();
+		Color color = Color.LIGHTSKYBLUE;
+		Color nextColor = color;
+		int colorCount = 0;
 		for (int x = 0; x < level.getCellMap().length; x++) {
 			for (int y = 0; y < level.getCellMap()[x].length; y++) {
 				Rectangle tile = new Rectangle(startX + (x * tileWidth), startY + (y * tileHeight), tileWidth, tileHeight);
@@ -96,20 +103,9 @@ public class CaveVisualizer extends Application {
 					tile.setFill(Color.DARKGREY);
 				}
 				else {
-					if (level.getIdMap()[x][y] == 1) {
-						tile.setFill(Color.LIGHTPINK);
-					}
-					else if (level.getIdMap()[x][y] == 2) {
-						tile.setFill(Color.GREEN);
-					}
-					else if (level.getIdMap()[x][y] == 3) {
-						tile.setFill(Color.DEEPPINK);
-					}
-					else {
-						tile.setFill(Color.DARKBLUE);
-					}
+					tile.setFill(Color.SADDLEBROWN);
 				}
-				tile.setStroke(Color.BLACK);
+				tile.setStroke(Color.DARKSLATEGREY);
 				group.getChildren().add(tile);
 			}
 		}		

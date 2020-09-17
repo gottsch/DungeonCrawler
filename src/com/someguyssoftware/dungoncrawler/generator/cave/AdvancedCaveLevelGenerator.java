@@ -22,4 +22,10 @@ public class AdvancedCaveLevelGenerator extends AbstractCellularAutomataCaveGene
 		// TODO Auto-generated method stub
 		return null;
 	}
+
+	@Override
+	public ILevel init() {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

@@ -13,7 +13,7 @@ import com.someguyssoftware.dungoncrawler.generator.ILevel;
 public class CaveLevel implements ILevel {
 	private boolean[][] cellMap;
 	private Integer[][] idMap;
-	Map<Integer, Cave> caves;
+	private Map<Integer, ICave> caves;
 	
 	public CaveLevel() {}
 
@@ -33,14 +33,14 @@ public class CaveLevel implements ILevel {
 		this.idMap = idMap;
 	}
 
-	public Map<Integer, Cave> getCaves() {
+	public Map<Integer, ICave> getCaves() {
 		if (caves == null) {
 			caves  = new HashMap<>();
 		}
 		return caves;
 	}
 
-	public void setCaves(Map<Integer, Cave> caves) {
+	public void setCaves(Map<Integer, ICave> caves) {
 		this.caves = caves;
 	}
 }

@@ -3,19 +3,22 @@
  */
 package com.someguyssoftware.dungoncrawler.generator.cave;
 
-import java.util.Map.Entry;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 
 import com.someguyssoftware.dungoncrawler.generator.Coords2D;
+import com.someguyssoftware.dungoncrawler.generator.Coords2DComparator;
 import com.someguyssoftware.dungoncrawler.generator.ILevel;
+import com.someguyssoftware.dungoncrawler.graph.mst.Edge;
 
 /**
- * @author Mark Gottschling
+ * 
+ * @author Mark Gottschling on Jun 20, 2020
  *
  */
 public class CaveLevelGenerator extends AbstractCellularAutomataCaveGenerator {
-
-	private static final int MIN_CAVE_SIZE = 30;
 
 	/**
 	 * 
@@ -26,7 +29,7 @@ public class CaveLevelGenerator extends AbstractCellularAutomataCaveGenerator {
 		Random random = new Random();
 		boolean[][] cellMap = initMap(random);
 		CaveLevel caveData;
-		
+
 		for (int stepIndex = 0; stepIndex < getIterations(); stepIndex++) {
 			cellMap = process(cellMap);
 		}
@@ -34,40 +37,50 @@ public class CaveLevelGenerator extends AbstractCellularAutomataCaveGenerator {
 		cellMap = fill(cellMap);
 		// add one more process iteration to clean up
 		cellMap = process(cellMap);
-		
+
+		// locate all the caves
 		caveData = findCaves(cellMap);
-		
+
+		// remove invalid/small caves
 		caveData = pruneCaves(caveData);
+
+		// update the properties
+		for (ICave cave : caveData.getCaves().values()) {
+			updateCaveProperites(cave);
+		}
+		
+		// connect caves with hallways/corridors/paths
+//		caveData = connectCaves(caveData);
 		
 		return caveData;
 	}
-	
-	/**
-	 * 
-	 * @param caveLevel
-	 * @return
-	 */
-	private CaveLevel pruneCaves(CaveLevel caveLevel) {
-		CaveLevel newCaveLevel = new CaveLevel();
 
-		for (Entry<Integer, Cave> entry : caveLevel.getCaves().entrySet()) {
-			Cave cave = entry.getValue();
-			if (cave.getCells().size() < MIN_CAVE_SIZE) {
-
-				for (Coords2D cell : cave.getCells()) {
-					// set all cells to closed (true)
-					caveLevel.getCellMap()[cell.getX()][cell.getY()] = true;
-					// set all IDs to -1
-					caveLevel.getIdMap()[cell.getX()][cell.getY()] = -1;
-				}				
-			}
-			else {
-				newCaveLevel.getCaves().put(cave.getId(), cave);
-			}
+	private CaveLevel connectCaves(CaveLevel caveData) {
+		if (caveData.getCaves().size() <= 1) {
+			return caveData;
 		}
-		newCaveLevel.setCellMap(caveLevel.getCellMap());
-		newCaveLevel.setIdMap(caveLevel.getIdMap());
-		return newCaveLevel;
+		
+		/*
+		 * resultant list of edges from triangulation of rooms.
+		 */
+		List<Edge> edges = new ArrayList<>();
+		
+		// randomly select a start cave
+		ICave startCave = null;
+		
+		// randomly select an end cave
+		ICave endCave = null;
+		
+		// triangulate valid rooms
+		edges = triangulate((List<ICave>)caveData.getCaves().values());
+		if (edges == null) {
+//			return EMPTY_LEVEL;
+			return null;
+		}
+		
+		
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 	/**
@@ -103,5 +116,11 @@ public class CaveLevelGenerator extends AbstractCellularAutomataCaveGenerator {
 			}
 		}
 		return newMap;
+	}
+
+	@Override
+	public ILevel init() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

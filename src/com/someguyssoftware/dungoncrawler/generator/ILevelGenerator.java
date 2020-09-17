@@ -20,4 +20,6 @@ public interface ILevelGenerator {
 
 	ILevelGenerator withHeight(int height);
 
+	ILevel init();
+
 }

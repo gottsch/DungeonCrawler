@@ -11,10 +11,39 @@ public class Coords2D {
 	private int x;
 	private int y;
 	
+	/**
+	 * 
+	 */
 	public Coords2D() {}
+	
+	/**
+	 * 
+	 * @param x
+	 * @param y
+	 */
 	public Coords2D(int x, int y) {
 		this.x = x;
 		this.y = y;
+	}
+	
+	public Coords2D(Coords2D coords) {
+		this.x = coords.getX();
+		this.y = coords.getY();		
+	}
+	
+	public double getDistance(Coords2D destination) {
+		// TODO 
+		return 0;
+	}
+	
+    public void translate(int xDistance, int yDistance) {
+        this.x += xDistance;
+        this.y += yDistance;
+    }
+    
+	public void setLocation(int x, int y) {
+		setX(x);
+		setY(y);
 	}
 	
 	public int getX() {

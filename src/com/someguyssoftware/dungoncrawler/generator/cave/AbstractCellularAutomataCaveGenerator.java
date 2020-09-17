@@ -3,17 +3,34 @@
  */
 package com.someguyssoftware.dungoncrawler.generator.cave;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Vector;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.util.Map.Entry;
 
 import com.someguyssoftware.dungoncrawler.generator.Coords2D;
+import com.someguyssoftware.dungoncrawler.generator.Coords2DComparator;
 import com.someguyssoftware.dungoncrawler.generator.ILevelGenerator;
+import com.someguyssoftware.dungoncrawler.graph.mst.Edge;
+
+import io.github.jdiemke.triangulation.DelaunayTriangulator;
+import io.github.jdiemke.triangulation.Edge2D;
+import io.github.jdiemke.triangulation.NotEnoughPointsException;
+import io.github.jdiemke.triangulation.Triangle2D;
+import io.github.jdiemke.triangulation.Vector2D;
 
 /**
- * @author Mark
+ * 
+ * @author Mark Gottschling on Jun 25, 2020
  *
  */
 public abstract class AbstractCellularAutomataCaveGenerator implements ICellularAutomataCaveGenerator {
@@ -27,8 +44,11 @@ public abstract class AbstractCellularAutomataCaveGenerator implements ICellular
 	private int smoothing = 3;
 	private int fill = 4;
 	
+	private static final int MIN_CAVE_SIZE = 30;
 	private static final List<Coords2D> DIRECTIONS;	
 	private static final List<Coords2D> TRAILING_DIRECTIONS;
+	
+	protected static final Logger logger = LogManager.getLogger();
 	
 	static {
 		DIRECTIONS = Arrays.asList(new Coords2D[] {
@@ -216,8 +236,8 @@ public abstract class AbstractCellularAutomataCaveGenerator implements ICellular
 	 */
 	public CaveLevel findCaves(boolean[][] map) {
 		CaveLevel caveData = new CaveLevel();
-		Map<Integer, Cave> caves = new HashMap<>();
-		Cave cave = null;
+		Map<Integer, ICave> caves = new HashMap<>();
+		ICave cave = null;
 		Integer[][] idMap = new Integer[map.length][map[0].length];
 		Integer caveID = 0;
 		Integer caveIDCounter = 0;
@@ -268,12 +288,12 @@ public abstract class AbstractCellularAutomataCaveGenerator implements ICellular
 	 * @param caves
 	 * @return
 	 */
-	private Cave merge(Integer id1, Integer id2, Map<Integer, Cave> caves, Integer[][] caveIDs) {
-		Cave resultCave = null;
+	private ICave merge(Integer id1, Integer id2, Map<Integer, ICave> caves, Integer[][] caveIDs) {
+		ICave resultCave = null;
 		// get the cave the cell belongs to
-		Cave cave = caves.get(id1);
+		ICave cave = caves.get(id1);
 		// get the trailing cave of the cell
-		Cave otherCave = caves.get(id2);
+		ICave otherCave = caves.get(id2);
 //		System.out.println(String.format("[%s]cave1.size -> %s, [%s]cave2.size -> [%s]", cave.getId(),  cave.getCells().size(), otherCave.getId(), otherCave.getCells().size()));
 		if (cave.getCells().size() > otherCave.getCells().size()) {
 			// cycle through all cells updating the ID array
@@ -316,7 +336,234 @@ public abstract class AbstractCellularAutomataCaveGenerator implements ICellular
 		
 		return false;
 	}
+	
+	/**
+	 * 
+	 * @param caveLevel
+	 * @return
+	 */
+	protected CaveLevel pruneCaves(CaveLevel caveLevel) {
+		CaveLevel newCaveLevel = new CaveLevel();
 
+		for (Entry<Integer, ICave> entry : caveLevel.getCaves().entrySet()) {
+			ICave cave = entry.getValue();
+			if (cave.getCells().size() < MIN_CAVE_SIZE) {
+
+				for (Coords2D cell : cave.getCells()) {
+					// set all cells to closed (true)
+					caveLevel.getCellMap()[cell.getX()][cell.getY()] = true;
+					// set all IDs to -1
+					caveLevel.getIdMap()[cell.getX()][cell.getY()] = -1;
+				}				
+			}
+			else {
+				newCaveLevel.getCaves().put(cave.getId(), cave);
+			}
+		}
+		newCaveLevel.setCellMap(caveLevel.getCellMap());
+		newCaveLevel.setIdMap(caveLevel.getIdMap());
+		return newCaveLevel;
+	}
+
+	/**
+	 * 
+	 * @param cave
+	 * @return
+	 */
+	protected ICave updateCaveProperites(ICave cave) {
+		// calculate all cave properties
+		int minX, maxX;
+		int minY, maxY;
+
+		minX = maxX = cave.getCells().get(0).getX();
+		minY = maxY = cave.getCells().get(0).getY();
+		// find the min and max of x and y
+		for (Coords2D cell : cave.getCells()) {
+			if (cell.getX() < minX) {
+				minX = cell.getX();
+			}
+			else if (cell.getX() > maxX) {
+				maxX = cell.getX();
+			}
+
+			if (cell.getY() < minY) {
+				minY = cell.getY();
+			}
+			else if (cell.getY() > maxY) {
+				maxY = cell.getY();
+			}
+		}
+		cave.setCoords(new Coords2D(minX, minY));
+		cave.setWidth(maxX - minX);
+		cave.setHeight(maxY - minY);
+
+		// sort the cells
+		Collections.sort(cave.getCells(), new Coords2DComparator());
+
+		return cave;
+	}
+	
+	/**
+	 * 
+	 * @param caves
+	 * @return
+	 */
+	protected List<Edge> triangulate(List<ICave> caves) {
+		/*
+		 * maps all rooms by XZ plane (ie x:z)
+		 * this is required for the Delaunay Triangulation library because it only returns edges without any identifying properties, only points
+		 */
+		Map<String, ICave> map = new HashMap<>();
+		
+		/*
+		 * holds all caves in Vector2D format.
+		 * used for the Delaunay Triangulation library to calculate all the edges between caves.
+		 * 
+		 */
+		Vector<Vector2D> pointSet = new Vector<>();		
+		
+		/*
+		 * holds all the edges that are produced from triangulation
+		 */
+		List<Edge> edges = new ArrayList<>();
+		
+		/*
+		 *  weight/cost array of all rooms
+		 */
+		double[][] matrix = getDistanceMatrix(caves);
+		/**
+		 * a flag to indicate that an edge leading to the "end" room is created
+		 */
+		boolean isEndEdgeMet = false;
+		int endEdgeCount = 0;
+
+		// sort caves by id - why?
+//		Collections.sort(rooms, Room.idComparator);
+
+		// map all rooms by XZ plane and build all edges.
+		for (ICave cave : caves) {
+//			ICoords center = room.getCoords();
+			Coords2D center = cave.getCenter();
+			
+			// map out the rooms by IDs
+//			map.put(center.getX() + ":" + center.getZ(), cave);
+			// convert coords into vector2d for triangulation
+			Vector2D v = new Vector2D(center.getX(), center.getY());
+//			logger.debug(String.format("Room.id: %d = Vector2D: %s", room.getId(), v.toString()));
+			pointSet.add(v);
+		}
+
+		// triangulate the set of points
+		DelaunayTriangulator triangulator = null;
+		try {
+			triangulator = new DelaunayTriangulator(pointSet);
+			triangulator.triangulate();
+		}
+		catch(NotEnoughPointsException e) {
+			logger.warn("Not enough points where provided for triangulation. Level generation aborted.");
+			return null; // TODO return empty list
+		}
+		catch(Exception e) {
+			if (caves !=null) logger.debug("rooms.size=" + caves.size());
+			else logger.debug("Rooms is NULL!");
+			if (pointSet != null) logger.debug("Pointset.size=" + pointSet.size());
+			else logger.debug("Pointset is NULL!");
+			
+			logger.error("Unable to triangulate: ", e);
+		}
+
+		// retrieve all the triangles from triangulation
+		List<Triangle2D> triangles = triangulator.getTriangles();
+
+		for(Triangle2D triangle : triangles) {
+			// locate the corresponding rooms from the points of the triangles
+			ICave r1 = map.get((int)triangle.a.x + ":" + (int)triangle.a.y);
+			ICave r2 = map.get((int)triangle.b.x + ":" + (int)triangle.b.y);
+			ICave r3 = map.get((int)triangle.c.x + ":" + (int)triangle.c.y);
+
+			// build an edge based on room distance matrix
+			// begin Minimum Spanning Tree calculations
+			Edge e = new Edge(r1.getId(), r2.getId(), matrix[r1.getId()][r2.getId()]);
+			
+			// TODO for boss room, not necessarily end room
+			// remove any edges that lead to the end room if the end room already has one edge
+			// remove (or don't add) any edges that lead to the end room if the end room already has it's maximum edges (degrees)
+//			if (!r1.isEnd() && !r2.isEnd()) {
+////			if (!r1.getType().equals(Type.BOSS) && !r2.getType().equals(Type.BOSS)) {
+//				edges.add(e);
+//			}
+//			else if (r1.isStart() || r2.isStart()) {
+//				// skip if start joins the end
+//			}
+//			else if (!isEndEdgeMet) {
+////				 add the edge
+				edges.add(e);
+//				// increment the number of edges leading to the end room
+//				endEdgeCount++;
+//				// get the end room
+//				ICave end = r1.isEnd() ? r1 : r2;
+//				if (endEdgeCount >= end.getDegrees()) {
+//					isEndEdgeMet = true;
+//				}
+//			}
+			
+			e = new Edge(r2.getId(), r3.getId(), matrix[r2.getId()][r3.getId()]);
+//			if (!r2.isEnd() && !r3.isEnd()) {
+//				edges.add(e);
+//			}
+//			else if (r1.isStart() || r2.isStart()) {
+//				// skip
+//			}
+//			else if (!isEndEdgeMet) {
+				edges.add(e);
+//				isEndEdgeMet = true;
+//			}
+			
+			e = new Edge(r1.getId(), r3.getId(), matrix[r1.getId()][r3.getId()]);
+//			if (!r1.isEnd() && !r3.isEnd()) {
+//				edges.add(e);
+//			}
+//			else if (r1.isStart() || r2.isStart()) {
+//				// skip
+//			}
+//			else if (!isEndEdgeMet) {
+				edges.add(e);
+//				isEndEdgeMet = true;
+//			}
+		}
+		return edges;
+	}
+	
+	// TODO this can be moved into ILevelGenerator -> works for caves, rooms, etc
+	// TODO ICave needs to extend something more generic that can be applied to caves and rooms, like ISpace
+	/**
+	 * It is assumed that the caves/rooms list is sorted in some fashion or the caller has a method to map the matrix indices back to a cave/room object
+	 * @param caves
+	 * @return
+	 */
+	protected static double[][] getDistanceMatrix(List<ICave> caves) {
+		double[][] matrix = new double[caves.size()][caves.size()];
+
+		for (int i = 0; i < caves.size(); i++) {
+			ICave cave = caves.get(i);
+			for (int j = 0; j < caves.size(); j++) {
+				ICave node = caves.get(j);
+				if (cave == node) {
+					matrix[i][j] = 0.0;
+				}
+				else {
+					if (matrix[i][j] == 0.0) {
+						// calculate distance;
+						double dist = cave.getCenter().getDistance(node.getCenter());
+						matrix[i][j] = dist;
+						matrix[j][i] = dist;
+					}
+				}
+			}
+		}
+		return matrix;
+	}
+	
 	public float getChanceToStartSolid() {
 		return chanceToStartSolid;
 	}
