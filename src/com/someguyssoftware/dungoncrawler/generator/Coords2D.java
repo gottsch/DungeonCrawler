@@ -32,8 +32,9 @@ public class Coords2D {
 	}
 	
 	public double getDistance(Coords2D destination) {
-		// TODO 
-		return 0;
+	    double d0 = this.getX() - destination.getX();
+	    double d1 = this.getY() - destination.getY();
+	    return Math.sqrt(d0 * d0 + d1 * d1);
 	}
 	
     public void translate(int xDistance, int yDistance) {

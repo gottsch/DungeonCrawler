@@ -3,6 +3,9 @@
  */
 package com.someguyssoftware.dungoncrawler.generator;
 
+import java.util.List;
+
+
 /**
  * @author Mark
  *
@@ -22,4 +25,31 @@ public interface ILevelGenerator {
 
 	ILevel init();
 
+	/**
+	 * It is assumed that the rooms list is sorted in some fashion or the caller has a method to map the matrix indices back to a room object
+	 * @param nodes
+	 * @return
+	 */
+	public static double[][] getDistanceMatrix(List<? extends INode> nodes) {
+		double[][] matrix = new double[nodes.size()][nodes.size()];
+
+		for (int i = 0; i < nodes.size(); i++) {
+			INode node1 = nodes.get(i);
+			for (int j = 0; j < nodes.size(); j++) {
+				INode node2 = nodes.get(j);
+				if (node1 == node2) {
+					matrix[i][j] = 0.0;
+				}
+				else {
+					if (matrix[i][j] == 0.0) {
+						// calculate distance;
+						double dist = node1.getCenter().getDistance(node2.getCenter());
+						matrix[i][j] = dist;
+						matrix[j][i] = dist;
+					}
+				}
+			}
+		}
+		return matrix;
+	}
 }

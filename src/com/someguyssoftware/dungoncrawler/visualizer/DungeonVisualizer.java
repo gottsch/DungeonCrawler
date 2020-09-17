@@ -11,6 +11,7 @@ import com.someguyssoftware.dungoncrawler.generator.Coords2D;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.DungeonLevel;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.DungeonLevelGenerator;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.DungeonRoom;
+import com.someguyssoftware.dungoncrawler.generator.dungeon.DungeonRoomType;
 
 import javafx.application.Application;
 import javafx.event.ActionEvent;
@@ -37,8 +38,10 @@ import javafx.stage.Stage;
 public class DungeonVisualizer extends Application {
 
 	private static final Paint ROCK_COLOR = Color.DARKGREY;
-	private static final Paint MAIN_ROOM_COLOR = Color.RED;
-	private static final Paint MINOR_ROOM_COLOR = Color.CORNFLOWERBLUE;
+	private static final Paint START_ROOM_COLOR = Color.GREEN;
+	private static final Paint END_ROOM_COLOR = Color.RED;
+	private static final Paint MAIN_ROOM_COLOR = Color.DARKBLUE;
+	private static final Paint MINOR_ROOM_COLOR =Color.DARKGREY;
 	private static final Paint ROOM_FLOOR_COLOR = Color.DARKSLATEGREY;
 	
 	private DungeonLevelGenerator dungeonGenerator = new DungeonLevelGenerator();
@@ -100,16 +103,10 @@ public class DungeonVisualizer extends Application {
 		int startX = 0;
 		int startY = 0;
 		
-		// map of dungeonID -> colors
-//		Map<Integer, Color> dungeonColors = new HashMap<>();
-//		Color color = Color.LIGHTSKYBLUE;
-//		Color nextColor = color;
-//		int colorCount = 0;
-		
-		Counter roomCounter = new Counter();
+//		Counter roomCounter = new Counter();
 		// TODO change to for each room, get the x,y and reference the cellmap.
 		level.getRooms().forEach(room -> {
-			int roomIndex = roomCounter.add();
+//			int roomIndex = roomCounter.add();
 			for (int x = 0; x < room.getBox().getWidth(); x++) {
 				for (int y = 0; y < room.getBox().getHeight(); y++) {
 					int absX = room.getOrigin().getX() + x ;
@@ -119,25 +116,37 @@ public class DungeonVisualizer extends Application {
 					if (absX < level.getCellMap().length && absY < level.getCellMap()[0].length
 							&& absX >=0 && absY >=0) {
 						
+						// setup the common drawing attributes
+						tile.setStrokeWidth(0.5);
+						tile.setFill(ROOM_FLOOR_COLOR);
+						
 						if (level.getCellMap()[absX][absY]) {
 							tile.setFill(ROCK_COLOR);
 						}
 						else {
 							if (room.isMain()) {
-								tile.setStroke(MAIN_ROOM_COLOR);
+								switch(room.getRoomType()) {
+								case START:
+									tile.setStroke(START_ROOM_COLOR);
+									break;
+								case END:
+									tile.setStroke(END_ROOM_COLOR);
+									break;
+								default:
+									tile.setStroke(MAIN_ROOM_COLOR);
+								}
 							}
 							else {
 								tile.setStroke(MINOR_ROOM_COLOR);
 							}
-							tile.setStrokeWidth(0.5);
-							tile.setFill(ROOM_FLOOR_COLOR);
 						}
+						
 						group.getChildren().add(tile);
 					}
 				}
 			}
-			// add index
-			Text text = new Text(startX + (room.getOrigin().getX() * tileWidth) + 2, startY + (room.getOrigin().getY() * tileHeight) + 10, String.valueOf(roomIndex));
+			// add id
+			Text text = new Text(startX + (room.getOrigin().getX() * tileWidth) + 2, startY + (room.getOrigin().getY() * tileHeight) + 10, String.valueOf(room.getId()));
 			text.setFont(new Font(10));
 			text.setFill(Color.ANTIQUEWHITE);
 			group.getChildren().add(text);
@@ -148,13 +157,20 @@ public class DungeonVisualizer extends Application {
 			dimensionsText.setFill(Color.ANTIQUEWHITE);
 			group.getChildren().add(dimensionsText);
 			
+			// add room outlines
 			Rectangle outline = new Rectangle(startX + (room.getOrigin().getX() * tileWidth), startY + (room.getOrigin().getY() * tileHeight),
 					room.getBox().getWidth() * tileWidth, room.getBox().getHeight() * tileHeight);
 			outline.setFill(Color.TRANSPARENT);
-			outline.setStroke(Color.ALICEBLUE);
+			if (room.getRoomType() == DungeonRoomType.START) {
+				outline.setStroke(Color.YELLOW);
+			}
+			else {
+				outline.setStroke(Color.WHITE);
+			}
 			group.getChildren().add(outline);
 		});
 		
+		// TODO values need to be calculated
 		// add a center rectangle
 		Rectangle center = new Rectangle(237, 237, 6, 6);
 		center.setFill(Color.RED);
@@ -247,7 +263,7 @@ public class DungeonVisualizer extends Application {
     	Button initButton = new Button("Initiate Dungeon");
     	Button iterationButton = new Button("Do Iteration");
     	
-    	// this creates a new dungeon level
+    	// this creates and builds a new dungeon level
     	newButton.setOnAction(new EventHandler<ActionEvent>() {
     	    @Override public void handle(ActionEvent e) {
     	    	
@@ -267,7 +283,9 @@ public class DungeonVisualizer extends Application {
     	    }
     	});
     	
-    	// TODO need a button to start but not build a dungeon
+    	/*
+    	 * this button intializes a new dungeon but doesn't build it (ie perform all the steps)
+    	 */
     	initButton.setOnAction(new EventHandler<ActionEvent>() {
     		@Override public void handle(ActionEvent e) {
     	    	level = (DungeonLevel) dungeonGenerator

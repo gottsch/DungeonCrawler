@@ -43,4 +43,28 @@ public class CaveLevel implements ILevel {
 	public void setCaves(Map<Integer, ICave> caves) {
 		this.caves = caves;
 	}
+
+	@Override
+	public int getWidth() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public void setWidth(int width) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public int getDepth() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public void setDepth(int depth) {
+		// TODO Auto-generated method stub
+		
+	}
 }

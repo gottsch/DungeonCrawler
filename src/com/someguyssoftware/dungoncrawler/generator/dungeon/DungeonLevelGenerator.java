@@ -4,12 +4,24 @@
 package com.someguyssoftware.dungoncrawler.generator.dungeon;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Vector;
+
 
 import com.someguyssoftware.dungoncrawler.generator.Coords2D;
 import com.someguyssoftware.dungoncrawler.generator.ILevel;
 import com.someguyssoftware.dungoncrawler.generator.ILevelGenerator;
+import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
+import com.someguyssoftware.dungoncrawler.graph.mst.Edge;
+
+import io.github.jdiemke.triangulation.DelaunayTriangulator;
+import io.github.jdiemke.triangulation.NotEnoughPointsException;
+import io.github.jdiemke.triangulation.Triangle2D;
+import io.github.jdiemke.triangulation.Vector2D;
 
 /**
  * Overlapping rectangle code based on https://stackoverflow.com/questions/3265986/an-algorithm-to-space-out-overlapping-rectangles
@@ -46,16 +58,22 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		Random random = new Random();
 		boolean[][] cellMap = initMap(random);
 		 
-		// TODO init rooms taking info from controls - ex # of rooms, min width, max width, min depth, max depth, size of map, spawn boundary, etc.
+		// TODO init rooms taking info from controls - ex # of rooms, min width, max width, min height, max height, size of map, spawn boundary, etc.
 		List<IDungeonRoom> rooms = initRooms(random);
 		
-		// TODO separate rooms
+		// separate rooms
 		rooms = separateRooms(rooms, movementFactor);
 		
-		// TODO select main rooms
+		// select main rooms
 		rooms = selectMainRooms(rooms, meanFactor);
 		
 		// TODO triangulate
+		// triangulate valid rooms
+		List<Edge> edges = null;
+		edges = triangulate(rooms);
+		if (edges == null) {
+			return null;//EMPTY_LEVEL;
+		}
 		
 		// TODO minimum spanning tree
 		
@@ -64,6 +82,8 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		// TODO add hallways
 		
 		// TODO reintroduce minor rooms that intersect with hallways
+		
+		// TODO add elevation variance
 		
 
 		cellMap = updateCellMap(cellMap, rooms);
@@ -74,6 +94,127 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		return dungeonData;
 	}
 	
+	private List<Edge> triangulate(List<IDungeonRoom> rooms) {
+		/*
+		 * maps all rooms by XZ plane (ie x:z)
+		 * this is required for the Delaunay Triangulation library because it only returns edges without any identifying properties, only points
+		 */
+		Map<String, Room> map = new HashMap<>();
+		/*
+		 * holds all rooms in Vector2D format.
+		 * used for the Delaunay Triangulation library to calculate all the edges between rooms.
+		 * 
+		 */
+		Vector<Vector2D> pointSet = new Vector<>();		
+		/*
+		 * holds all the edges that are produced from triangulation
+		 */
+		List<Edge> edges = new ArrayList<>();
+		/*
+		 *  weight/cost array of all rooms
+		 */
+		double[][] matrix = ILevelGenerator.getDistanceMatrix(rooms);
+		/**
+		 * a flag to indicate that an edge leading to the "end" room is created
+		 */
+		boolean isEndEdgeMet = false;
+		int endEdgeCount = 0;
+
+		// sort rooms by id
+		Collections.sort(rooms, Room.idComparator);
+
+		// map all rooms by XZ plane and build all edges.
+		for (Room room : rooms) {
+			ICoords center = room.getCoords();
+			// map out the rooms by IDs
+			map.put(center.getX() + ":" + center.getZ(), room);
+			// convert coords into vector2d for triangulation
+			Vector2D v = new Vector2D(center.getX(), center.getZ());
+//			Dungeons2.log.debug(String.format("Room.id: %d = Vector2D: %s", room.getId(), v.toString()));
+			pointSet.add(v);
+		}
+
+		// triangulate the set of points
+		DelaunayTriangulator triangulator = null;
+		try {
+			triangulator = new DelaunayTriangulator(pointSet);
+			triangulator.triangulate();
+		}
+		catch(NotEnoughPointsException e) {
+			Dungeons2.log.warn("Not enough points where provided for triangulation. Level generation aborted.");
+			return null; // TODO return empty list
+		}
+		catch(Exception e) {
+			if (rooms !=null) Dungeons2.log.debug("rooms.size=" + rooms.size());
+			else Dungeons2.log.debug("Rooms is NULL!");
+			if (pointSet != null) Dungeons2.log.debug("Pointset.size=" + pointSet.size());
+			else Dungeons2.log.debug("Pointset is NULL!");
+			
+			Dungeons2.log.error("Unable to triangulate: ", e);
+		}
+
+		// retrieve all the triangles from triangulation
+		List<Triangle2D> triangles = triangulator.getTriangles();
+
+		for(Triangle2D triangle : triangles) {
+			// locate the corresponding rooms from the points of the triangles
+			Room r1 = map.get((int)triangle.a.x + ":" + (int)triangle.a.y);
+			Room r2 = map.get((int)triangle.b.x + ":" + (int)triangle.b.y);
+			Room r3 = map.get((int)triangle.c.x + ":" + (int)triangle.c.y);
+
+			// build an edge based on room distance matrix
+			// begin Minimum Spanning Tree calculations
+			Edge e = new Edge(r1.getId(), r2.getId(), matrix[r1.getId()][r2.getId()]);
+			
+			// TODO for boss room, not necessarily end room
+			// remove any edges that lead to the end room if the end room already has one edge
+			// remove (or don't add) any edges that lead to the end room if the end room already has it's maximum edges (degrees)
+			if (!r1.isEnd() && !r2.isEnd()) {
+//			if (!r1.getType().equals(Type.BOSS) && !r2.getType().equals(Type.BOSS)) {
+				edges.add(e);
+			}
+			else if (r1.isStart() || r2.isStart()) {
+				// skip if start joins the end
+			}
+			else if (!isEndEdgeMet) {
+				// add the edge
+				edges.add(e);
+				// increment the number of edges leading to the end room
+				endEdgeCount++;
+				// get the end room
+				Room end = r1.isEnd() ? r1 : r2;
+				if (endEdgeCount >= end.getDegrees()) {
+					isEndEdgeMet = true;
+				}
+			}
+			
+			e = new Edge(r2.getId(), r3.getId(), matrix[r2.getId()][r3.getId()]);
+			if (!r2.isEnd() && !r3.isEnd()) {
+				edges.add(e);
+			}
+			else if (r1.isStart() || r2.isStart()) {
+				// skip
+			}
+			else if (!isEndEdgeMet) {
+				edges.add(e);
+				isEndEdgeMet = true;
+			}
+			
+			e = new Edge(r1.getId(), r3.getId(), matrix[r1.getId()][r3.getId()]);
+			if (!r1.isEnd() && !r3.isEnd()) {
+				edges.add(e);
+			}
+			else if (r1.isStart() || r2.isStart()) {
+				// skip
+			}
+			else if (!isEndEdgeMet) {
+				edges.add(e);
+				isEndEdgeMet = true;
+			}
+		}
+		return edges;
+	}
+
 	/**
 	 * 
 	 * @param rooms
@@ -81,24 +222,15 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 	 * @return
 	 */
 	public List<IDungeonRoom> selectMainRooms(List<IDungeonRoom> rooms, double meanFactor) {
-		int totalX = 0;
-		int totalY = 0;
 		int totalArea = 0;
 		for (IDungeonRoom room : rooms) {
-//			totalX += room.getBox().getWidth();
-//			totalY += room.getBox().getHeight();
 			totalArea += room.getBox().getWidth() * room.getBox().getHeight();
 		}
-//		int meanX = (int) ((totalX / rooms.size()) * meanFactor);
-//		int meanY =(int) ((totalY / rooms.size()) * meanFactor);
-//		int meanArea = meanX*meanY;
+
 		int meanArea = (int) totalArea / rooms.size();
-		
-//		System.out.printf("meanX=%s, meanY=%s, meanArea=%s", meanX, meanY, meanArea);
+
 		System.out.printf("meanArea=%s\n", meanArea);
 		rooms.forEach(room -> {
-//			if (room.getBox().getWidth() > meanX
-//					&& room.getBox().getHeight() > meanY) {
 			if (room.getBox().getWidth() * room.getBox().getHeight() > meanArea) {
 				room.setMain(true);
 			}
@@ -265,7 +397,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 	 * @return
 	 */
 	protected boolean[][] initMap(Random random) {
-		return initMap(width, height, random);
+		return initMap(this.width, this.height, random);
 	}
 	
 	/**
@@ -279,34 +411,74 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		boolean[][] map = new boolean[width][height];
 		for (int x = 0; x < width; x++) {
 			for (int y = 0; y < height; y++) {
-//				if (random.nextDouble() < chanceToStartSolid) {
 					map[x][y] = true;
-//				}
 			}
 		}
 		return map;
 	}
 
 	private List<IDungeonRoom> initRooms(Random random) {
-		return initRooms(random, width, height);
+		return initRooms(random, this.width, this.height, this.minRoomSize, this.maxRoomSize);
 	}
 
-	private List<IDungeonRoom> initRooms(Random random, final int width, final int height) {
+	/**
+	 * 
+	 * @param random
+	 * @param width
+	 * @param height
+	 * @return
+	 */
+	private List<IDungeonRoom> initRooms(Random random, final int width, final int height, final int minRoomSize, final int maxRoomSize) {
 		List<IDungeonRoom> rooms = new ArrayList<>();
 		Coords2D centerPoint = new Coords2D(width/2, height / 2);
 
+		// TODO this needs to be defined somewhere
+		Rectangle2D boundingBox = new Rectangle2D(0, 0, 30, 30);	
+		
+		IDungeonRoom startRoom = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
+		startRoom
+			.setRoomType(DungeonRoomType.START)
+			.setMain(true)
+			.setId(0);		
+		rooms.add(startRoom);
 		
 		// TODO need to add start room and flagged
 		for (int roomIndex = 0; roomIndex < numberOfRooms; roomIndex++) {
-			int sizeX = random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
-			int sizeZ = random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
-			int offsetX = (random.nextInt(30) - 15) - (sizeX / 2); // TODO make these values a constant somewhere or a passed in value
-			int offsetZ = (random.nextInt(30) - 15) - (sizeZ / 2);
-
-			DungeonRoom room = new DungeonRoom(new Coords2D(centerPoint.getX() + offsetX, centerPoint.getY() + offsetZ), sizeX, sizeZ);
+			IDungeonRoom room = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
+			room.setId(roomIndex + 1);
 			rooms.add(room);
 		}
+		
+		// have to have at least one end room
+		IDungeonRoom endRoom = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
+		endRoom
+			.setRoomType(DungeonRoomType.END)
+			.setMain(true)
+			.setId(rooms.size() + 1);		
+		rooms.add(endRoom);
+		
 		return rooms;
+	}
+
+	/**
+	 * 
+	 * @param random
+	 * @param centerPoint
+	 * @param boundingBox
+	 * @param minRoomSize2
+	 * @param maxRoomSize2
+	 * @return
+	 */
+	private IDungeonRoom generateRoom(Random random, Coords2D centerPoint, Rectangle2D boundingBox, int minRoomSize2,
+			int maxRoomSize2) {
+		
+		int sizeX = random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
+		int sizeZ = random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
+		int offsetX = (random.nextInt(boundingBox.getWidth()) - (boundingBox.getWidth()/2)) - (sizeX / 2);
+		int offsetZ = (random.nextInt(boundingBox.getHeight()) - (boundingBox.getHeight()/2)) - (sizeZ / 2);
+		
+		IDungeonRoom room = new DungeonRoom(new Coords2D(centerPoint.getX() + offsetX, centerPoint.getY() + offsetZ), sizeX, sizeZ);
+		return room;
 	}
 
 	public int getWidth() {

@@ -9,4 +9,12 @@ package com.someguyssoftware.dungoncrawler.generator;
  */
 public interface ILevel {
 
+	int getWidth();
+
+	void setWidth(int width);
+
+	int getDepth();
+
+	void setDepth(int depth);
+	
 }

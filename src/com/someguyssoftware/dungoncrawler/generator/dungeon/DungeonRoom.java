@@ -11,24 +11,29 @@ import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
  *
  */
 public class DungeonRoom implements IDungeonRoom {
+	private int id;
 	private Rectangle2D box;
 	private boolean isMain;
-//	private int width;
-//	private int depth;
-//	private Coords2D origin;
-//	private Coords2D center;
-
+	private DungeonRoomType roomType;
+	
+	/*
+	 * 
+	 */
 	public DungeonRoom(int x, int y, int width, int depth) {
 		this(new Coords2D(x, y), width, depth);
 	}
+	
+	/**
+	 * 
+	 * @param origin
+	 * @param width
+	 * @param depth
+	 */
 	public DungeonRoom(Coords2D origin, int width, int depth) {
-//		super(origin, width, depth);
 		this.box = new Rectangle2D(origin, width, depth);
-//		this.origin = origin;
-//		this.width = width;
-//		this.depth = depth;
-//		this.center = new Coords2D((origin.getX() + width)/2, (origin.getY() + depth)/2);
+		this.roomType = DungeonRoomType.STANDARD;
 	}
+	
 	public Rectangle2D getBox() {
 		return box;
 	}
@@ -57,29 +62,30 @@ public class DungeonRoom implements IDungeonRoom {
 	}
 	
 	@Override
-	public void setMain(boolean isMain) {
+	public IDungeonRoom setMain(boolean isMain) {
 		this.isMain = isMain;
+		return this;
 	}
 
-//
-//	@Override
-//	public int getWidth() {
-//		return width;
-//	}
-//
-//	@Override
-//	public void setWidth(int width) {
-//		this.width = width;
-//	}
-//
-//	@Override
-//	public int getHeight() {
-//		return depth;
-//	}
-//
-//	@Override
-//	public void setDepth(int depth) {
-//		this.depth = depth;
-//	}
+	@Override
+	public DungeonRoomType getRoomType() {
+		return roomType;
+	}
+
+	@Override
+	public IDungeonRoom setRoomType(DungeonRoomType roomType) {
+		this.roomType = roomType;
+		return this;
+	}
+
+	@Override
+	public int getId() {
+		return id;
+	}
+
+	@Override
+	public void setId(int id) {
+		this.id = id;
+	}
 
 }
