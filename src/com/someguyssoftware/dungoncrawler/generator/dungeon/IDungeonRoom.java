@@ -11,6 +11,7 @@ import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
  *
  */
 public interface IDungeonRoom extends INode {
+
 	
 	public Rectangle2D getBox();
 	public void setBox(Rectangle2D box);
@@ -20,6 +21,4 @@ public interface IDungeonRoom extends INode {
 
 	DungeonRoomType getRoomType();
 	IDungeonRoom setRoomType(DungeonRoomType roomType);
-	int getId();
-	void setId(int id);
 }

@@ -11,10 +11,13 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Vector;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import com.someguyssoftware.dungoncrawler.generator.Coords2D;
 import com.someguyssoftware.dungoncrawler.generator.ILevel;
 import com.someguyssoftware.dungoncrawler.generator.ILevelGenerator;
+import com.someguyssoftware.dungoncrawler.generator.INode;
 import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
 import com.someguyssoftware.dungoncrawler.graph.mst.Edge;
 
@@ -29,6 +32,9 @@ import io.github.jdiemke.triangulation.Vector2D;
  *
  */
 public class DungeonLevelGenerator implements ILevelGenerator {
+	
+	protected static final Logger LOGGER = LogManager.getLogger(DungeonLevelGenerator.class);
+	
 	private int width = 96;
 	private int height = 96;
 	private int numberOfRooms = 15;
@@ -69,11 +75,11 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		
 		// TODO triangulate
 		// triangulate valid rooms
-		List<Edge> edges = null;
-		edges = triangulate(rooms);
-		if (edges == null) {
-			return null;//EMPTY_LEVEL;
-		}
+//		List<Edge> edges = null;
+//		edges = triangulate(rooms);
+//		if (edges == null) {
+//			return null;//EMPTY_LEVEL;
+//		}
 		
 		// TODO minimum spanning tree
 		
@@ -94,126 +100,126 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		return dungeonData;
 	}
 	
-	private List<Edge> triangulate(List<IDungeonRoom> rooms) {
-		/*
-		 * maps all rooms by XZ plane (ie x:z)
-		 * this is required for the Delaunay Triangulation library because it only returns edges without any identifying properties, only points
-		 */
-		Map<String, Room> map = new HashMap<>();
-		/*
-		 * holds all rooms in Vector2D format.
-		 * used for the Delaunay Triangulation library to calculate all the edges between rooms.
-		 * 
-		 */
-		Vector<Vector2D> pointSet = new Vector<>();		
-		/*
-		 * holds all the edges that are produced from triangulation
-		 */
-		List<Edge> edges = new ArrayList<>();
-		/*
-		 *  weight/cost array of all rooms
-		 */
-		double[][] matrix = ILevelGenerator.getDistanceMatrix(rooms);
-		/**
-		 * a flag to indicate that an edge leading to the "end" room is created
-		 */
-		boolean isEndEdgeMet = false;
-		int endEdgeCount = 0;
-
-		// sort rooms by id
-		Collections.sort(rooms, Room.idComparator);
-
-		// map all rooms by XZ plane and build all edges.
-		for (Room room : rooms) {
-			ICoords center = room.getCoords();
-			// map out the rooms by IDs
-			map.put(center.getX() + ":" + center.getZ(), room);
-			// convert coords into vector2d for triangulation
-			Vector2D v = new Vector2D(center.getX(), center.getZ());
-//			Dungeons2.log.debug(String.format("Room.id: %d = Vector2D: %s", room.getId(), v.toString()));
-			pointSet.add(v);
-		}
-
-		// triangulate the set of points
-		DelaunayTriangulator triangulator = null;
-		try {
-			triangulator = new DelaunayTriangulator(pointSet);
-			triangulator.triangulate();
-		}
-		catch(NotEnoughPointsException e) {
-			Dungeons2.log.warn("Not enough points where provided for triangulation. Level generation aborted.");
-			return null; // TODO return empty list
-		}
-		catch(Exception e) {
-			if (rooms !=null) Dungeons2.log.debug("rooms.size=" + rooms.size());
-			else Dungeons2.log.debug("Rooms is NULL!");
-			if (pointSet != null) Dungeons2.log.debug("Pointset.size=" + pointSet.size());
-			else Dungeons2.log.debug("Pointset is NULL!");
-			
-			Dungeons2.log.error("Unable to triangulate: ", e);
-		}
-
-		// retrieve all the triangles from triangulation
-		List<Triangle2D> triangles = triangulator.getTriangles();
-
-		for(Triangle2D triangle : triangles) {
-			// locate the corresponding rooms from the points of the triangles
-			Room r1 = map.get((int)triangle.a.x + ":" + (int)triangle.a.y);
-			Room r2 = map.get((int)triangle.b.x + ":" + (int)triangle.b.y);
-			Room r3 = map.get((int)triangle.c.x + ":" + (int)triangle.c.y);
-
-			// build an edge based on room distance matrix
-			// begin Minimum Spanning Tree calculations
-			Edge e = new Edge(r1.getId(), r2.getId(), matrix[r1.getId()][r2.getId()]);
-			
-			// TODO for boss room, not necessarily end room
-			// remove any edges that lead to the end room if the end room already has one edge
-			// remove (or don't add) any edges that lead to the end room if the end room already has it's maximum edges (degrees)
-			if (!r1.isEnd() && !r2.isEnd()) {
-//			if (!r1.getType().equals(Type.BOSS) && !r2.getType().equals(Type.BOSS)) {
-				edges.add(e);
-			}
-			else if (r1.isStart() || r2.isStart()) {
-				// skip if start joins the end
-			}
-			else if (!isEndEdgeMet) {
-				// add the edge
-				edges.add(e);
-				// increment the number of edges leading to the end room
-				endEdgeCount++;
-				// get the end room
-				Room end = r1.isEnd() ? r1 : r2;
-				if (endEdgeCount >= end.getDegrees()) {
-					isEndEdgeMet = true;
-				}
-			}
-			
-			e = new Edge(r2.getId(), r3.getId(), matrix[r2.getId()][r3.getId()]);
-			if (!r2.isEnd() && !r3.isEnd()) {
-				edges.add(e);
-			}
-			else if (r1.isStart() || r2.isStart()) {
-				// skip
-			}
-			else if (!isEndEdgeMet) {
-				edges.add(e);
-				isEndEdgeMet = true;
-			}
-			
-			e = new Edge(r1.getId(), r3.getId(), matrix[r1.getId()][r3.getId()]);
-			if (!r1.isEnd() && !r3.isEnd()) {
-				edges.add(e);
-			}
-			else if (r1.isStart() || r2.isStart()) {
-				// skip
-			}
-			else if (!isEndEdgeMet) {
-				edges.add(e);
-				isEndEdgeMet = true;
-			}
-		}
-		return edges;
-	}
+//	private List<Edge> triangulate(List<? extends INode> nodes) {
+//		/*
+//		 * maps all rooms by XZ plane (ie x:z)
+//		 * this is required for the Delaunay Triangulation library because it only returns edges without any identifying properties, only points
+//		 */
+//		Map<String, INode> map = new HashMap<>();
+//		/*
+//		 * holds all rooms in Vector2D format.
+//		 * used for the Delaunay Triangulation library to calculate all the edges between rooms.
+//		 * 
+//		 */
+//		Vector<Vector2D> pointSet = new Vector<>();		
+//		/*
+//		 * holds all the edges that are produced from triangulation
+//		 */
+//		List<Edge> edges = new ArrayList<>();
+//		/*
+//		 *  weight/cost array of all rooms
+//		 */
+//		double[][] matrix = ILevelGenerator.getDistanceMatrix(nodes);
+//		/**
+//		 * a flag to indicate that an edge leading to the "end" room is created
+//		 */
+//		boolean isEndEdgeMet = false;
+//		int endEdgeCount = 0;
+//
+////		 sort rooms by id - WHY? BECAUSE the getDistanceMatrix is assuming the ids match their order in the list.... need a better way
+////		Collections.sort(rooms, Room.idComparator);
+//
+//		// map all rooms by XZ plane and build all edges.
+//		for (INode node : nodes) {
+//			Coords2D origin = node.getOrigin();
+//			// map out the rooms by IDs
+//			map.put(origin.getX() + ":" + origin.getY(), node);
+//			// convert coords into vector2d for triangulation
+//			Vector2D v = new Vector2D(origin.getX(), origin.getY());
+////			Dungeons2.log.debug(String.format("Room.id: %d = Vector2D: %s", room.getId(), v.toString()));
+//			pointSet.add(v);
+//		}
+//
+//		// triangulate the set of points
+//		DelaunayTriangulator triangulator = null;
+//		try {
+//			triangulator = new DelaunayTriangulator(pointSet);
+//			triangulator.triangulate();
+//		}
+//		catch(NotEnoughPointsException e) {
+//			LOGGER.warn("Not enough points where provided for triangulation. Level generation aborted.");
+//			return null; // TODO return empty list
+//		}
+//		catch(Exception e) {
+////			if (nodes !=null) Dungeons2.log.debug("rooms.size=" + nodes.size());
+////			else Dungeons2.log.debug("Rooms is NULL!");
+////			if (pointSet != null) Dungeons2.log.debug("Pointset.size=" + pointSet.size());
+////			else Dungeons2.log.debug("Pointset is NULL!");
+//			
+//			LOGGER.error("Unable to triangulate: ", e);
+//		}
+//
+//		// retrieve all the triangles from triangulation
+//		List<Triangle2D> triangles = triangulator.getTriangles();
+//
+//		for(Triangle2D triangle : triangles) {
+//			// locate the corresponding rooms from the points of the triangles
+//			INode r1 = map.get((int)triangle.a.x + ":" + (int)triangle.a.y);
+//			INode r2 = map.get((int)triangle.b.x + ":" + (int)triangle.b.y);
+//			INode r3 = map.get((int)triangle.c.x + ":" + (int)triangle.c.y);
+//
+//			// build an edge based on room distance matrix
+//			// begin Minimum Spanning Tree calculations
+//			Edge e = new Edge(r1.getId(), r2.getId(), matrix[r1.getId()][r2.getId()]);
+//			
+//			// TODO for boss room, not necessarily end room
+//			// remove any edges that lead to the end room if the end room already has one edge
+//			// remove (or don't add) any edges that lead to the end room if the end room already has it's maximum edges (degrees)
+//			if (!r1.isEnd() && !r2.isEnd()) {
+////			if (!r1.getType().equals(Type.BOSS) && !r2.getType().equals(Type.BOSS)) {
+//				edges.add(e);
+//			}
+//			else if (r1.isStart() || r2.isStart()) {
+//				// skip if start joins the end
+//			}
+//			else if (!isEndEdgeMet) {
+//				// add the edge
+//				edges.add(e);
+//				// increment the number of edges leading to the end room
+//				endEdgeCount++;
+//				// get the end room
+//				Room end = r1.isEnd() ? r1 : r2;
+//				if (endEdgeCount >= end.getDegrees()) {
+//					isEndEdgeMet = true;
+//				}
+//			}
+//			
+//			e = new Edge(r2.getId(), r3.getId(), matrix[r2.getId()][r3.getId()]);
+//			if (!r2.isEnd() && !r3.isEnd()) {
+//				edges.add(e);
+//			}
+//			else if (r1.isStart() || r2.isStart()) {
+//				// skip
+//			}
+//			else if (!isEndEdgeMet) {
+//				edges.add(e);
+//				isEndEdgeMet = true;
+//			}
+//			
+//			e = new Edge(r1.getId(), r3.getId(), matrix[r1.getId()][r3.getId()]);
+//			if (!r1.isEnd() && !r3.isEnd()) {
+//				edges.add(e);
+//			}
+//			else if (r1.isStart() || r2.isStart()) {
+//				// skip
+//			}
+//			else if (!isEndEdgeMet) {
+//				edges.add(e);
+//				isEndEdgeMet = true;
+//			}
+//		}
+//		return edges;
+//	}
 
 	/**
 	 * 

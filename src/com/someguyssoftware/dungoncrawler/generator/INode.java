@@ -6,6 +6,10 @@ package com.someguyssoftware.dungoncrawler.generator;
  *
  */
 public interface INode {
+	
+	int getId();
+	void setId(int id);
+	
 	public Coords2D getOrigin();
 	public void setOrigin(Coords2D origin);
 	
