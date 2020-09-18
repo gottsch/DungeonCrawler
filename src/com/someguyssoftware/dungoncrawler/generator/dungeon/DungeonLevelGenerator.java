@@ -102,37 +102,42 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 	
 	private List<Edge> triangulate(List<? extends INode> nodes) {
 		/*
-		 * maps all rooms by XZ plane (ie x:z)
+		 * maps all nodes by origin(x,y)
 		 * this is required for the Delaunay Triangulation library because it only returns edges without any identifying properties, only points
 		 */
 		Map<String, INode> map = new HashMap<>();
-		/*
-		 * holds all rooms in Vector2D format.
-		 * used for the Delaunay Triangulation library to calculate all the edges between rooms.
+        
+        /*
+		 * holds all nodes in Vector2D format.
+		 * used for the Delaunay Triangulation library to calculate all the edges between nodes.
 		 * 
 		 */
 		Vector<Vector2D> pointSet = new Vector<>();		
-		/*
+        
+        /*
 		 * holds all the edges that are produced from triangulation
 		 */
 		List<Edge> edges = new ArrayList<>();
 		/*
 		 *  weight/cost array of all rooms
 		 */
-		double[][] matrix = ILevelGenerator.getDistanceMatrix(nodes);
+        // double[][] matrix = ILevelGenerator.getDistanceMatrix(nodes);
+        Map<String, Double> matrix = ILevelGenerator.getDistanceMatrix(nodes);
+
 		/**
 		 * a flag to indicate that an edge leading to the "end" room is created
 		 */
 		boolean isEndEdgeMet = false;
 		int endEdgeCount = 0;
 
+        // TODO don't need anymore when using ids in a map
 //		 sort rooms by id - WHY? BECAUSE the getDistanceMatrix is assuming the ids match their order in the list.... need a better way
 //		Collections.sort(rooms, Room.idComparator);
 
 		// map all rooms by XZ plane and build all edges.
 		for (INode node : nodes) {
 			Coords2D origin = node.getOrigin();
-			// map out the rooms by IDs
+			// map out the rooms by origin
 			map.put(origin.getX() + ":" + origin.getY(), node);
 			// convert coords into vector2d for triangulation
 			Vector2D v = new Vector2D(origin.getX(), origin.getY());
@@ -170,16 +175,16 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 
 			// build an edge based on room distance matrix
 			// begin Minimum Spanning Tree calculations
-			Edge e = new Edge(r1.getId(), r2.getId(), matrix[r1.getId()][r2.getId()]);
+			Edge e = new Edge(r1.getId(), r2.getId(), /*matrix[r1.getId()][r2.getId()]*/matrix.get(getKey(r1, r2)));
 			
 			// TODO for boss room, not necessarily end room
-			// remove any edges that lead to the end room if the end room already has one edge
+			// remove any edges that lead to the end room(s) if the end room already has one edge
 			// remove (or don't add) any edges that lead to the end room if the end room already has it's maximum edges (degrees)
-			if (!r1.isEnd() && !r2.isEnd()) {
+			if (r1.getType() != NodeType.END && r2.getType() != NodeType.END) {
 //			if (!r1.getType().equals(Type.BOSS) && !r2.getType().equals(Type.BOSS)) {
 				edges.add(e);
 			}
-			else if (r1.isStart() || r2.isStart()) {
+			else if (r1.getType() == NodeType.START || r2.getType()  == NodeType.START) {
 				// skip if start joins the end
 			}
 			else if (!isEndEdgeMet) {
@@ -188,7 +193,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 				// increment the number of edges leading to the end room
 				endEdgeCount++;
 				// get the end room
-				Room end = r1.isEnd() ? r1 : r2;
+				INode end = r1.isEnd() ? r1 : r2;
 				if (endEdgeCount >= end.getDegrees()) {
 					isEndEdgeMet = true;
 				}

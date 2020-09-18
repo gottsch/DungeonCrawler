@@ -14,7 +14,7 @@ public class DungeonRoom implements IDungeonRoom {
 	private int id;
 	private Rectangle2D box;
 	private boolean isMain;
-	private DungeonRoomType roomType;
+	private NodeType nodeType;
 	
 	/*
 	 * 
@@ -68,13 +68,13 @@ public class DungeonRoom implements IDungeonRoom {
 	}
 
 	@Override
-	public DungeonRoomType getRoomType() {
-		return roomType;
+	public NodeType getType() {
+		return nodeType;
 	}
 
 	@Override
-	public IDungeonRoom setRoomType(DungeonRoomType roomType) {
-		this.roomType = roomType;
+	public IDungeonRoom setType(NodeType type) {
+		this.nodeType = type;
 		return this;
 	}
 
