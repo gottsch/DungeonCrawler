@@ -13,8 +13,11 @@ public interface INode {
 	public Coords2D getOrigin();
 	public void setOrigin(Coords2D origin);
 	
+	public int getMaxDegrees();
+	public void setMaxDegrees(int degrees);
+	
     public NodeType getType();
-    public void setType(NodeType type);
+    public INode setType(NodeType type);
     
 	public Coords2D getCenter();
 }

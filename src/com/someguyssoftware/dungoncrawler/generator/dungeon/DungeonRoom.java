@@ -4,6 +4,8 @@
 package com.someguyssoftware.dungoncrawler.generator.dungeon;
 
 import com.someguyssoftware.dungoncrawler.generator.Coords2D;
+import com.someguyssoftware.dungoncrawler.generator.INode;
+import com.someguyssoftware.dungoncrawler.generator.NodeType;
 import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
 
 /**
@@ -13,8 +15,9 @@ import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
 public class DungeonRoom implements IDungeonRoom {
 	private int id;
 	private Rectangle2D box;
-	private boolean isMain;
+	private int maxDegrees;
 	private NodeType nodeType;
+	private boolean isMain;
 	
 	/*
 	 * 
@@ -31,7 +34,8 @@ public class DungeonRoom implements IDungeonRoom {
 	 */
 	public DungeonRoom(Coords2D origin, int width, int depth) {
 		this.box = new Rectangle2D(origin, width, depth);
-		this.roomType = DungeonRoomType.STANDARD;
+		this.maxDegrees = 3;
+		this.nodeType = NodeType.STANDARD;
 	}
 	
 	public Rectangle2D getBox() {
@@ -73,7 +77,7 @@ public class DungeonRoom implements IDungeonRoom {
 	}
 
 	@Override
-	public IDungeonRoom setType(NodeType type) {
+	public INode setType(NodeType type) {
 		this.nodeType = type;
 		return this;
 	}
@@ -86,6 +90,16 @@ public class DungeonRoom implements IDungeonRoom {
 	@Override
 	public void setId(int id) {
 		this.id = id;
+	}
+
+	@Override
+	public int getMaxDegrees() {
+		return maxDegrees;
+	}
+
+	@Override
+	public void setMaxDegrees(int degrees) {
+		this.maxDegrees = degrees;
 	}
 
 }

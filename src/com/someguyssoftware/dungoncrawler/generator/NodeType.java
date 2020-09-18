@@ -1,7 +1,4 @@
-/**
- * 
- */
-package com.someguyssoftware.dungoncrawler.generator.dungeon;
+package com.someguyssoftware.dungoncrawler.generator;
 
 /**
  * @author Mark Gottschling on Sep 17, 2020

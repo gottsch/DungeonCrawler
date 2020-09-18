@@ -32,8 +32,8 @@ public interface ILevelGenerator {
 	 * @param nodes
 	 * @return
 	 */
-	public static /*double[][]*/Map<String, Double> getDistanceMatrix(List<? extends INode> nodes) {
-        Map<String, Double> distanceMap = new HashMap<>();
+	public static double[][]/*Map<String, Double>*/ getDistanceMatrix(List<? extends INode> nodes) {
+//        Map<String, Double> distanceMap = new HashMap<>();
 		double[][] matrix = new double[nodes.size()][nodes.size()];
 
 		for (int i = 0; i < nodes.size(); i++) {
@@ -42,23 +42,23 @@ public interface ILevelGenerator {
 				INode node2 = nodes.get(j);
 				if (node1 == node2) {
                     matrix[i][j] = 0.0;
-                    distanceMap.put(getKey(node1, node2), Double.valueOf(0.0));
+//                    distanceMap.put(getKey(node1, node2), Double.valueOf(0.0));
 				}
 				else {
-                    //if (matrix[i][j] == 0.0) {
-                    if (distanceMap.get(getKey(node1, node2)) == 0.0) {
+                    if (matrix[i][j] == 0.0) {
+//                    if (distanceMap.get(getKey(node1, node2)) == null) {
 						// calculate distance;
 						double dist = node1.getCenter().getDistance(node2.getCenter());
 						matrix[i][j] = dist;
                         matrix[j][i] = dist;
-                        distanceMap.put(getKey(node1, node2), Double.valueOf(dist));
-                        distanceMap.put(getKey(node2, node1), Double.valueOf(dist));
+//                        distanceMap.put(getKey(node1, node2), Double.valueOf(dist));
+//                        distanceMap.put(getKey(node2, node1), Double.valueOf(dist));
 					}
 				}
 			}
 		}
-        // return matrix;
-        return distanceMap;
+         return matrix;
+//        return distanceMap;
 	}
 
     static String getKey(INode node1, INode node2) {
