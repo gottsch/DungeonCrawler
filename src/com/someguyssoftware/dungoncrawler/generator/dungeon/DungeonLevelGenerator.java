@@ -129,14 +129,15 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 			return EMPTY_LEVEL;
 		}
 			
-		// TODO add waylines
+		// add waylines
 		List<Edge> waylines = getWaylines(random, paths, orderedRooms, DungeonRoom::new);
 		
+		// TODO move to own method
 		// reintroduce minor rooms into ordered list. these are not auxiliary rooms until it is determine that they intersect with a corridor
 		rooms.forEach(room -> {
-//			System.out.printf("processing room -> %s, role -> %s\n", room.getId(), room.getRole());
-			if (room.getRole() != RoomRole.MAIN/*isMain()*/) {
-//				System.out.printf("Not main -> %s\n", room.getId());
+//			LOGGER.debug("processing room -> {}, role -> {}\n", room.getId(), room.getRole());
+			if (room.getRole() != RoomRole.MAIN) {
+//				LOGGER.debug("Not main -> {}\n", room.getId());
 				room.setId(orderedRooms.size());
 //				room.setRole(RoomRole.AUXILIARY); NOT YET!
 				if (intersects(room, waylines, orderedRooms)) {
@@ -145,11 +146,6 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 				orderedRooms.add(room);
 			}
 		});
-		
-
-		
-		// TODO reintroduce minor rooms that intersect with hallways
-//		List<IDungeonRoom> auxiliaryRoom = selectAuxiliaryRooms()
 		
 		// TODO add exits
 		
