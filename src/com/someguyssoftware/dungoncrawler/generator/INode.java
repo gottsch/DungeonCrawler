@@ -19,5 +19,12 @@ public interface INode {
     public NodeType getType();
     public INode setType(NodeType type);
     
+    /*
+     * convenience methods
+     */
 	public Coords2D getCenter();
+	public int getMinX();
+	public int getMaxX();
+	public int getMinY();
+	public int getMaxY();
 }

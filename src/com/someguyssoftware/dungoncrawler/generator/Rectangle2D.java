@@ -14,22 +14,63 @@ public class Rectangle2D {
 	int width;
 	int height;
 
+	/**
+	 * 
+	 * @param x
+	 * @param y
+	 * @param width
+	 * @param height
+	 */
 	public Rectangle2D(int x, int y, int width, int height) {
 		this(new Coords2D(x, y), width, height);
 	}
 
+	/**
+	 * 
+	 * @param coords
+	 * @param width
+	 * @param height
+	 */
 	public Rectangle2D(Coords2D coords, int width, int height) {
 		this.origin = coords;
 		this.width = width;
 		this.height = height;
 	}
 
+	/**
+	 * 
+	 * @param coords1
+	 * @param coords2
+	 */
+	public Rectangle2D(Coords2D coords1, Coords2D coords2) {
+		Coords2D origin = coords1.getX() < coords2.getX() || coords1.getY() < coords2.getY() ? coords1 : coords2;
+		this.origin = origin;
+		this.width = Math.abs(coords1.getX() - coords2.getX());
+		this.height = Math.abs(coords1.getY() - coords2.getY());
+		this.width = width ==0 ? 1 : width;
+		this.height = height == 0 ? 1 : width;
+	}
+	
+	/**
+	 * 
+	 * @param r
+	 * @return
+	 */
 	public boolean intersects(Rectangle2D r) {
 		return intersects(r.getOrigin().getX(), r.getOrigin().getY(), r.getWidth(), r.getHeight());
 	}
 
+	/**
+	 * 
+	 * @param x
+	 * @param y
+	 * @param w
+	 * @param h
+	 * @return
+	 */
 	public boolean intersects(int x, int y, int w, int h) {
-		if (isEmpty() || w <= 0 || h <= 0) {
+		// NOTE changed from w <=0 and h <=0
+		if (isEmpty() || w < 0 || h < 0) {
 			return false;
 		}
 		double x0 = getOrigin().getX();
@@ -45,7 +86,8 @@ public class Rectangle2D {
 	 * @return
 	 */
 	public boolean isEmpty() {
-		return (width <= 0) || (height <= 0);
+		// NOTE changed from width <=0 and height <=0
+		return (width < 0) || (height < 0);
 	}
 
 	public int getCenterX() {
@@ -98,5 +140,10 @@ public class Rectangle2D {
 
 	public void setHeight(int height) {
 		this.height = height;
+	}
+
+	@Override
+	public String toString() {
+		return "Rectangle2D [origin=" + origin + ", width=" + width + ", height=" + height + "]";
 	}
 }

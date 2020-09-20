@@ -15,8 +15,12 @@ import com.someguyssoftware.dungoncrawler.generator.INode;
 import com.someguyssoftware.dungoncrawler.generator.NodeType;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.DungeonLevel;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.DungeonLevelGenerator;
+import com.someguyssoftware.dungoncrawler.generator.dungeon.IDungeonRoom;
+import com.someguyssoftware.dungoncrawler.generator.dungeon.RoomRole;
 
 import javafx.application.Application;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
@@ -24,7 +28,10 @@ import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Toggle;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -46,7 +53,8 @@ public class DungeonVisualizer extends Application {
 	private static final Paint START_ROOM_COLOR = Color.GREEN;
 	private static final Paint END_ROOM_COLOR = Color.RED;
 	private static final Paint MAIN_ROOM_COLOR = Color.DARKBLUE;
-	private static final Paint MINOR_ROOM_COLOR =Color.DARKGREY;
+	private static final Paint AUXILILARY_ROOM_COLOR =Color.PURPLE;
+	private static final Paint NOT_INCLUDED_ROOM_COLOR = Color.GREY;
 	private static final Paint ROOM_FLOOR_COLOR = Color.DARKSLATEGREY;
 
 	private DungeonLevelGenerator dungeonGenerator = new DungeonLevelGenerator();
@@ -54,6 +62,13 @@ public class DungeonVisualizer extends Application {
 	private DungeonLevel level;
 	private Coords2D center;
 	private boolean hasIntersections = true;
+
+	private int startX = 0;
+	private int startY = 0;
+	private int tileWidth = 5;
+	private int tileHeight = 5;
+	
+	private boolean showWaylines = false;
 
 	/**
 	 * @param args
@@ -102,85 +117,86 @@ public class DungeonVisualizer extends Application {
 		bg.setFill(Color.BLACK);
 		group.getChildren().add(bg);
 
-		// add tiles
-		int tileWidth = 5;
-		int tileHeight = 5;
-		int startX = 0;
-		int startY = 0;
-
 		// add spawn boundary
 		Rectangle spawnBoundary = new Rectangle(165, 165, 150, 150);
 		spawnBoundary.setFill(Color.YELLOW);
 		spawnBoundary.setOpacity(0.25);
 		spawnBoundary.setStroke(Color.DARKGOLDENROD);
 		group.getChildren().add(spawnBoundary);
-		
+
 		//		Counter roomCounter = new Counter();
 		// TODO change to for each room, get the x,y and reference the cellmap.
 		level.getRooms().forEach(room -> {
+			if (room.getType() == NodeType.CONNECTOR) {
+				return;
+			}
 			//			int roomIndex = roomCounter.add();
 			for (int x = 0; x < room.getBox().getWidth(); x++) {
 				for (int y = 0; y < room.getBox().getHeight(); y++) {
 					int absX = room.getOrigin().getX() + x ;
 					int absY = room.getOrigin().getY() + y ;
 					Rectangle tile = new Rectangle(startX + (absX * tileWidth), startY + (absY * tileHeight), tileWidth, tileHeight);
-					// check for out of bounds
+					// ensure not out of bounds
 					if (absX < level.getCellMap().length && absY < level.getCellMap()[0].length
 							&& absX >=0 && absY >=0) {
+
+						// select the room color
+						Paint color = selectRoomColor(room);
 
 						// setup the common drawing attributes
 						tile.setStrokeWidth(0.5);
 						tile.setFill(ROOM_FLOOR_COLOR);
-
-						if (level.getCellMap()[absX][absY]) {
-							tile.setFill(ROCK_COLOR);
+						if (x == 0 || y == 0 || x == room.getBox().getWidth()-1 || y == room.getBox().getHeight()-1) {
+//							tile.setFill(color);
+							tile.setStroke(Color.LIGHTGREY);
 						}
 						else {
-							if (room.isMain()) {
-								switch(room.getType()) {
-								case START:
-									tile.setStroke(START_ROOM_COLOR);
-									break;
-								case END:
-									tile.setStroke(END_ROOM_COLOR);
-									break;
-								default:
-									tile.setStroke(MAIN_ROOM_COLOR);
-								}
-							}
-							else {
-								tile.setStroke(MINOR_ROOM_COLOR);
-							}
+							tile.setStroke(color);
 						}
+						
+//						if (level.getCellMap()[absX][absY]) {
+//							tile.setFill(ROCK_COLOR);
+//						}
+//						else {
+//							if (room.isMain()) {
+//								switch(room.getType()) {
+//								case START:
+//									tile.setStroke(START_ROOM_COLOR);
+//									break;
+//								case END:
+//									tile.setStroke(END_ROOM_COLOR);
+//									break;
+//								default:
+//									tile.setStroke(MAIN_ROOM_COLOR);
+//								}
+//							}
+//							else {
+//								tile.setStroke(MINOR_ROOM_COLOR);
+//							}
+//						}
 
 						group.getChildren().add(tile);
 					}
 				}
 			}
 
-			// add id
+			// add ids
 			Text text = new Text(startX + (room.getOrigin().getX() * tileWidth) + 2, startY + (room.getOrigin().getY() * tileHeight) + 10, String.valueOf(room.getId()));
 			text.setFont(new Font(10));
 			text.setFill(Color.ANTIQUEWHITE);
 			group.getChildren().add(text);
 
 			// add dimensions
-			Text dimensionsText = new Text(startX + (room.getOrigin().getX() * tileWidth) + 15, startY + (room.getOrigin().getY() * tileHeight) + 20, room.getBox().getWidth() + "x" + room.getBox().getHeight());
+			Text dimensionsText = new Text(startX + (room.getOrigin().getX() * tileWidth) + 15, 
+					startY + (room.getOrigin().getY() * tileHeight) + 20, 
+					room.getBox().getWidth() + "x" + room.getBox().getHeight());
 			dimensionsText.setFont(new Font(10));
 			dimensionsText.setFill(Color.ANTIQUEWHITE);
 			group.getChildren().add(dimensionsText);
 
 			// add room outlines
-			Rectangle outline = new Rectangle(startX + (room.getOrigin().getX() * tileWidth), startY + (room.getOrigin().getY() * tileHeight),
-					room.getBox().getWidth() * tileWidth, room.getBox().getHeight() * tileHeight);
-			outline.setFill(Color.TRANSPARENT);
-			if (room.getType() == NodeType.START) {
-				outline.setStroke(Color.YELLOW);
-			}
-			else {
-				outline.setStroke(Color.WHITE);
-			}
-			group.getChildren().add(outline);
+			addRoomOutlines(room, group);
+
 		});
 
 		// TODO values need to be calculated
@@ -191,13 +207,89 @@ public class DungeonVisualizer extends Application {
 		group.getChildren().add(center);
 
 		// add edges
+		addEdges(level, group);
+
+		// add paths
+		addPaths(level, group);
+
+		// add waylines
+		if (showWaylines) {
+			addWaylines(level, group);
+		}
+		
+		addCorridors(level, group);
+		
+		
+		// TEMP add chunk outlines (for Minecraft visuals)
+
+		mapBox.getChildren().add(group);
+	}
+
+	/**
+	 * 
+	 * @param level2
+	 * @param group
+	 */
+	private void addCorridors(DungeonLevel level2, Group group) {
+		level.getWaylines().forEach(wayline -> {
+			if (wayline.v < level.getRooms().size() && wayline.w < level.getRooms().size()) {
+				INode room1 = level.getRooms().get(wayline.v);
+				INode room2 = level.getRooms().get(wayline.w);
+				// draw vertically
+				if (room1.getOrigin().getX() == room2.getOrigin().getX()) {
+//					System.out.printf("drawing wayline from -> %s to %s\n", room1.getId(), room2.getId());
+					// order rooms for drawing
+					INode s = null;
+					INode e = null;
+					if (room1.getOrigin().getY() < room2.getOrigin().getY()) {
+						s = room1;
+						e = room2;
+					}
+					else {
+						s = room2;
+						e = room1;
+					}
+					for (int y = s.getOrigin().getY(); y < e.getOrigin().getY(); y++) {
+//						System.out.printf("draw at -> (%s, %s)\n",s.getOrigin().getX(), y);
+						Rectangle tile = new Rectangle(startX + (s.getOrigin().getX() * tileWidth), (y * tileHeight), tileWidth, tileHeight);
+						tile.setStroke(Color.YELLOW);
+						tile.setFill(Color.BLACK);
+						group.getChildren().add(tile);
+					}
+				}
+				// horizontally
+				else {
+					// order rooms for drawing
+					INode s = null;
+					INode e = null;
+					if (room1.getOrigin().getX() < room2.getOrigin().getX()) {
+						s = room1;
+						e = room2;
+					}
+					else {
+						s = room2;
+						e = room1;
+					}
+					for (int x = s.getOrigin().getX(); x < e.getOrigin().getX(); x++) {
+//						System.out.printf("draw at -> (%s, %s)\n", x, s.getOrigin().getY());
+						Rectangle tile = new Rectangle(startX + (x * tileWidth) , (s.getOrigin().getY() * tileHeight), tileWidth, tileHeight);
+						tile.setStroke(Color.YELLOW);
+						tile.setFill(Color.BLACK);
+						group.getChildren().add(tile);
+					}
+				}
+			}
+			else {
+				LOGGER.info("Skipping wayline edge v/w with index of :" + wayline.v + ", " + wayline.w);
+			}
+		});
+	}
+
+	private void addEdges(DungeonLevel level2, Group group) {
 		level.getEdges().forEach(edge -> {
-//			if (level.getRoomMap().containsKey(Integer.valueOf(edge.v)) && level.getRoomMap().containsKey(Integer.valueOf(edge.w))) {
-//				INode room1 = level.getRoomMap().get(Integer.valueOf(edge.v));
-//				INode room2 = level.getRoomMap().get(Integer.valueOf(edge.w));
-				if (edge.v < level.getRooms().size() && edge.w < level.getRooms().size()) {
-					INode room1 = level.getRooms().get(edge.v);
-					INode room2 = level.getRooms().get(edge.w);	
+			if (edge.v < level.getRooms().size() && edge.w < level.getRooms().size()) {
+				INode room1 = level.getRooms().get(edge.v);
+				INode room2 = level.getRooms().get(edge.w);	
 				Line line = new Line(room1.getCenter().getX() * tileWidth, room1.getCenter().getY() * tileHeight,
 						room2.getCenter().getX() * tileWidth, room2.getCenter().getY() * tileHeight);
 				line.setStroke(Color.BLUEVIOLET);
@@ -207,12 +299,86 @@ public class DungeonVisualizer extends Application {
 				LOGGER.info("Skipping edge v/w with index of :" + edge.v + ", " + edge.w);
 			}
 		});
-		
-		// add paths
+	}
+
+	/**
+	 * 
+	 * @param room
+	 * @param group
+	 */
+	private void addRoomOutlines(IDungeonRoom room, Group group) {
+		Rectangle outline = new Rectangle(startX + (room.getOrigin().getX() * tileWidth), startY + (room.getOrigin().getY() * tileHeight),
+				room.getBox().getWidth() * tileWidth, room.getBox().getHeight() * tileHeight);
+		outline.setFill(Color.TRANSPARENT);
+//		if (room.getType() == NodeType.START) {
+//			outline.setStroke(Color.YELLOW);
+//		}
+//		else {
+			outline.setStroke(Color.BEIGE);
+//		}
+		group.getChildren().add(outline);
+	}
+
+	/**
+	 * 
+	 * @param room
+	 * @return
+	 */
+	private Paint selectRoomColor(IDungeonRoom room) {
+		Paint color = null;
+		if (room.getRole() == RoomRole.MAIN/*isMain()*/) {
+			switch(room.getType()) {
+			case START:
+				 color = START_ROOM_COLOR;
+				break;
+			case END:
+				color = END_ROOM_COLOR;
+				break;
+			default:
+				color = MAIN_ROOM_COLOR;
+			}
+		}
+		else if (room.getRole() == RoomRole.AUXILIARY) {
+			color = AUXILILARY_ROOM_COLOR;
+		}
+		else {
+			color = NOT_INCLUDED_ROOM_COLOR;
+		}
+		return color;
+	}
+
+	/**
+	 * 
+	 * @param level
+	 * @param group
+	 */
+	private void addWaylines(DungeonLevel level, Group group) {
+		level.getWaylines().forEach(wayline -> {
+			if (wayline.v < level.getRooms().size() && wayline.w < level.getRooms().size()) {
+				INode room1 = level.getRooms().get(wayline.v);
+				INode room2 = level.getRooms().get(wayline.w);	
+				Line line = new Line(room1.getCenter().getX() * tileWidth, room1.getCenter().getY() * tileHeight,
+						room2.getCenter().getX() * tileWidth, room2.getCenter().getY() * tileHeight);
+				line.setStroke(Color.YELLOW);
+				line.setStrokeWidth(3.0);
+				group.getChildren().add(line);
+			}
+			else {
+				LOGGER.info("Skipping wayline edge v/w with index of :" + wayline.v + ", " + wayline.w);
+			}
+		});
+	}
+
+	/**
+	 * 
+	 * @param level2
+	 * @param group
+	 */
+	private void addPaths(DungeonLevel level, Group group) {
 		level.getPaths().forEach(path -> {
-				if (path.v < level.getRooms().size() && path.w < level.getRooms().size()) {
-					INode room1 = level.getRooms().get(path.v);
-					INode room2 = level.getRooms().get(path.w);	
+			if (path.v < level.getRooms().size() && path.w < level.getRooms().size()) {
+				INode room1 = level.getRooms().get(path.v);
+				INode room2 = level.getRooms().get(path.w);				
 				Line line = new Line(room1.getCenter().getX() * tileWidth, room1.getCenter().getY() * tileHeight,
 						room2.getCenter().getX() * tileWidth, room2.getCenter().getY() * tileHeight);
 				line.setStroke(Color.DARKRED);
@@ -223,11 +389,6 @@ public class DungeonVisualizer extends Application {
 				LOGGER.info("Skipping edge v/w with index of :" + path.v + ", " + path.w);
 			}
 		});
-
-		// TEMP add chunk outlines (for Minecraft visuals)
-
-
-		mapBox.getChildren().add(group);
 	}
 
 	/**
@@ -295,7 +456,7 @@ public class DungeonVisualizer extends Application {
 		labels.add(meanFactorLabel);
 		fields.add(meanFactorField);
 		hBoxes.add(meanFactorBox);
-		
+				
 		// path factor
 		Label pathFactorLabel = new Label("Path Factor:");
 		TextField pathFactorField = new TextField("0.25");
@@ -303,6 +464,33 @@ public class DungeonVisualizer extends Application {
 		labels.add(pathFactorLabel);
 		fields.add(pathFactorField);
 		hBoxes.add(pathFactorBox);
+		
+		// show waylines
+		ToggleGroup showWaylinesToggleGroup = new ToggleGroup();
+		Label showWaylinesLabel = new Label("Show Waylines:");
+		RadioButton showWaylinesOnButton = new RadioButton();
+		RadioButton showWaylinesOffButton = new RadioButton();
+		showWaylinesOnButton.setText("On");
+		showWaylinesOffButton.setText("Off");
+		showWaylinesOnButton.setToggleGroup(showWaylinesToggleGroup);
+		showWaylinesOffButton.setToggleGroup(showWaylinesToggleGroup);
+		showWaylinesOffButton.setSelected(true);
+		
+		showWaylinesToggleGroup.selectedToggleProperty().addListener(new ChangeListener<Toggle> () {
+			public void changed(ObservableValue<? extends Toggle> ov, Toggle oldToggle, Toggle newToggle) {
+				RadioButton rb = (RadioButton)showWaylinesToggleGroup.getSelectedToggle();
+					if (rb.getText().equals("On")) {
+						showWaylines = true;
+					}
+					else {
+						showWaylines = false;
+					}
+					System.out.println("show wayliens = " + showWaylines);				
+			}
+		});		
+		HBox showWaylinesBox = new HBox(showWaylinesLabel, showWaylinesOnButton, showWaylinesOffButton);
+		labels.add(showWaylinesLabel);
+		hBoxes.add(showWaylinesBox);
 
 		// buttons
 		HBox buttonsBox = new HBox();
@@ -348,7 +536,7 @@ public class DungeonVisualizer extends Application {
 
 				hasIntersections = true;
 				center = dungeonGenerator.getCenter(level.getRooms());
-				
+
 				buildMapPane(mapBox, level);
 			}
 		});
@@ -388,7 +576,8 @@ public class DungeonVisualizer extends Application {
 			box.setSpacing(5);
 		}
 
-		pane.getChildren().addAll(widthBox, heightBox, numRoomsBox, minRoomSizeBox, maxRoomSizeBox, movementFactorBox, meanFactorBox, pathFactorBox,
+		pane.getChildren().addAll(widthBox, heightBox, numRoomsBox, minRoomSizeBox, 
+				maxRoomSizeBox, movementFactorBox, meanFactorBox, showWaylinesBox, pathFactorBox,
 				buttonsBox, buttonsBox2);
 	}
 

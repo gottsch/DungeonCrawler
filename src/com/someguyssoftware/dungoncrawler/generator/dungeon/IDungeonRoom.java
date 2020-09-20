@@ -14,6 +14,9 @@ public interface IDungeonRoom extends INode {
 	public Rectangle2D getBox();
 	public void setBox(Rectangle2D box);
 	
-	public boolean isMain();
-	public IDungeonRoom setMain(boolean isMain);
+//	public boolean isMain();
+//	public IDungeonRoom setMain(boolean isMain);
+	
+	RoomRole getRole();
+	IDungeonRoom setRole(RoomRole roomRole);
 }

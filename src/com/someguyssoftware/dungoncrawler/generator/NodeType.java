@@ -7,6 +7,6 @@ package com.someguyssoftware.dungoncrawler.generator;
 public enum NodeType {
 	START,
 	END,
-	ANCHOR,
-	STANDARD;
+	STANDARD, 
+	CONNECTOR;
 }

@@ -59,4 +59,9 @@ public class Coords2D {
 	public void setY(int y) {
 		this.y = y;
 	}
+
+	@Override
+	public String toString() {
+		return "Coords2D [x=" + x + ", y=" + y + "]";
+	}
 }

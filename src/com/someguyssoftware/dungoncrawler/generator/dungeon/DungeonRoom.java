@@ -12,12 +12,21 @@ import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
  * @author Mark Gottschling on Sep 15, 2020
  *
  */
+// TODO extends AbstractGraphNode
 public class DungeonRoom implements IDungeonRoom {
 	private int id;
 	private Rectangle2D box;
 	private int maxDegrees;
 	private NodeType nodeType;
+	private RoomRole roomRole;
 	private boolean isMain;
+	
+	/**
+	 * Empty constructor
+	 */
+	public DungeonRoom() {
+		// ensure all required fields (ex box) are generated lazily in getters if allowing empty constructors
+	}
 	
 	/*
 	 * 
@@ -39,8 +48,12 @@ public class DungeonRoom implements IDungeonRoom {
 	}
 	
 	public Rectangle2D getBox() {
+		if (box == null) {
+			box = new Rectangle2D(0, 0, 0, 0);
+		}
 		return box;
 	}
+	
 	public void setBox(Rectangle2D box) {
 		this.box = box;
 	}
@@ -61,15 +74,35 @@ public class DungeonRoom implements IDungeonRoom {
 	}
 	
 	@Override
-	public boolean isMain() {
-		return isMain;
+	public int getMinX() {
+		return this.getBox().getMinX();
 	}
 	
 	@Override
-	public IDungeonRoom setMain(boolean isMain) {
-		this.isMain = isMain;
-		return this;
+	public int getMaxX() {
+		return this.getBox().getMaxX();
 	}
+	
+	@Override
+	public int getMinY() {
+		return this.getBox().getMinY();
+	}
+	
+	@Override
+	public int getMaxY() {
+		return this.getBox().getMaxY();
+	}
+	
+//	@Override
+//	public boolean isMain() {
+//		return isMain;
+//	}
+	
+//	@Override
+//	public IDungeonRoom setMain(boolean isMain) {
+//		this.isMain = isMain;
+//		return this;
+//	}
 
 	@Override
 	public NodeType getType() {
@@ -100,6 +133,17 @@ public class DungeonRoom implements IDungeonRoom {
 	@Override
 	public void setMaxDegrees(int degrees) {
 		this.maxDegrees = degrees;
+	}
+
+	@Override
+	public RoomRole getRole() {
+		return roomRole;
+	}
+
+	@Override
+	public IDungeonRoom setRole(RoomRole roomRole) {
+		this.roomRole = roomRole;
+		return this;
 	}
 
 }
