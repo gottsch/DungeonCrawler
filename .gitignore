@@ -13,3 +13,4 @@ gradle.log
 !*.gradlew
 !/models/
 !/libs/
+!*.xml
