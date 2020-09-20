@@ -13,8 +13,7 @@ import java.util.Random;
 import java.util.Vector;
 import java.util.function.Supplier;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+//LOGGER;
 
 import com.someguyssoftware.dungoncrawler.generator.Coords2D;
 import com.someguyssoftware.dungoncrawler.generator.ILevel;
@@ -41,7 +40,7 @@ import io.github.jdiemke.triangulation.Vector2D;
  */
 public class DungeonLevelGenerator implements ILevelGenerator {
 	
-	protected static final Logger LOGGER = LogManager.getLogger(DungeonLevelGenerator.class);
+//	protected static final LOGGER = LogManager.getLogger(DungeonLevelGenerator.class);
 	
 	private static final ILevel EMPTY_LEVEL = new DungeonLevel();
 
@@ -125,7 +124,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		
 		// test if start room can reach the end room
 		if (!breadthFirstSearch(start.getId(), end.getId(), orderedRooms, paths)) {
-			LOGGER.debug("A path doesn't exist from start room to end room on level.");
+			//LOGGER.info("A path doesn't exist from start room to end room on level.");
 			return EMPTY_LEVEL;
 		}
 			
@@ -238,7 +237,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 				
 				// NOTE node2P is the "destination" or "joint" node, so it should be shared with both segments
 				INode node2P = createConnectorNode(new Coords2D(node2.getCenter().getX(), node1Center.getY()), nodes, factory);
-				Edge wayline1 = new Edge(node1P.getId(), node2P.getId(), node1.getCenter().getDistance(node2.getCenter()));
+				Edge wayline1 = new Edge(node1P.getId(), node2P.getId(), 0/* node1.getCenter().getDistance(node2.getCenter())*/);
 				
 				// room2 is down (postivie-z) of room 1
 				if (node2.getCenter().getY() > node1.getCenter().getY()) {
@@ -248,7 +247,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 				else {
 					node1P = createConnectorNode(new Coords2D(node2.getCenter().getX(), node2.getMaxY()-1), nodes, factory);
 				}
-				Edge wayline2 = new Edge(node1P.getId(), node2P.getId(), node1.getCenter().getDistance(node2.getCenter()));
+				Edge wayline2 = new Edge(node1P.getId(), node2P.getId(), 0 /*node1.getCenter().getDistance(node2.getCenter())*/);
 				
 				if (wayline1 != null && wayline2 != null) {
 					waylines.add(wayline1);
@@ -268,7 +267,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		node.setOrigin(origin);
 		node.setId(referencedNodes.size());
 		referencedNodes.add(node);
-		System.out.printf("adding connector with id -> %s\n",node.getId());
+//		System.out.printf("adding connector with id -> %s\n",node.getId());
 		return node;
 	}
 	
@@ -421,7 +420,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 				edgeCount[node2.getId()]++;
 			}
 			else {
-				LOGGER.warn(String.format("Ignored Room: array out-of-bounds: v: %d, w: %d", edge.v, edge.w));
+				//LOGGER.warn(String.format("Ignored Room: array out-of-bounds: v: %d, w: %d", edge.v, edge.w));
 			}
 		}		
 		
@@ -500,7 +499,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 			map.put(origin.getX() + ":" + origin.getY(), node);
 			// convert coords into vector2d for triangulation
 			Vector2D v = new Vector2D(origin.getX(), origin.getY());
-//			LOGGER.debug(String.format("Room.id: %d = Vector2D: %s", room.getId(), v.toString()));
+			//LOGGER.info(String.format("Room.id: %d = Vector2D: %s", node.getId(), v.toString()));
 			pointSet.add(v);
 		}
 
@@ -511,16 +510,16 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 			triangulator.triangulate();
 		}
 		catch(NotEnoughPointsException e) {
-			LOGGER.warn("Not enough points where provided for triangulation. Level generation aborted.");
+			//LOGGER.warn("Not enough points where provided for triangulation. Level generation aborted.");
 			return edges;
 		}
 		catch(Exception e) {
-//			if (nodes !=null) Dungeons2.log.debug("rooms.size=" + nodes.size());
-//			else Dungeons2.log.debug("Rooms is NULL!");
-//			if (pointSet != null) Dungeons2.log.debug("Pointset.size=" + pointSet.size());
-//			else Dungeons2.log.debug("Pointset is NULL!");
+//			if (nodes !=null) Dungeons2.log.info("rooms.size=" + nodes.size());
+//			else Dungeons2.log.info("Rooms is NULL!");
+//			if (pointSet != null) Dungeons2.log.info("Pointset.size=" + pointSet.size());
+//			else Dungeons2.log.info("Pointset is NULL!");
 			
-			LOGGER.error("Unable to triangulate: ", e);
+			//LOGGER.error("Unable to triangulate: ", e);
 		}
 
 		// retrieve all the triangles from triangulation
@@ -600,7 +599,8 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 
 		int meanArea = (int) totalArea / rooms.size();
 
-		System.out.printf("meanArea=%s\n", meanArea);
+		System.out.printf("meanArea= %s \n", meanArea);
+		//LOGGER.info("meanArea = {}", meanArea);
 		rooms.forEach(room -> {
 			if (room.getType() == NodeType.START || room.getType() == NodeType.END || room.getBox().getWidth() * room.getBox().getHeight() > meanArea) {
 				room.setRole(RoomRole.MAIN); //setMain(true);
@@ -798,7 +798,6 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		
 		IDungeonRoom startRoom = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
 		startRoom
-//			.setMain(true)
 			.setRole(RoomRole.MAIN)
 			.setType(NodeType.START)
 			.setId(0);		
@@ -814,7 +813,6 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		// have to have at least one end room
 		IDungeonRoom endRoom = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
 		endRoom
-//			.setMain(true)
 			.setRole(RoomRole.MAIN)	
 			.setType(NodeType.END)
 			.setId(rooms.size()); // TODO check if still works without +1
@@ -884,7 +882,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		while (queue.size() != 0) {
 			// Dequeue a vertex from queue and print it
 			int s = queue.poll();
-//			LOGGER.debug("polling edge id: " + s);
+			//LOGGER.debug("polling edge id: " + s);
 
 			// get all adjacent vertices of the dequeued vertex s
 			// if a adjacent has not been visited, then mark it

@@ -7,9 +7,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import com.someguyssoftware.dungoncrawler.generator.Coords2D;
 import com.someguyssoftware.dungoncrawler.generator.INode;
 import com.someguyssoftware.dungoncrawler.generator.NodeType;
@@ -47,7 +44,7 @@ import javafx.stage.Stage;
  * Based on technique from https://www.gamasutra.com/blogs/AAdonaac/20150903/252889/Procedural_Dungeon_Generation_Algorithm.php
  */
 public class DungeonVisualizer extends Application {
-	protected static final Logger LOGGER = LogManager.getLogger(DungeonVisualizer.class);
+//	protected static final Logger LOGGER = LogManager.getLogger(DungeonVisualizer.class);
 
 	private static final Paint ROCK_COLOR = Color.DARKGREY;
 	private static final Paint START_ROOM_COLOR = Color.GREEN;
@@ -280,7 +277,7 @@ public class DungeonVisualizer extends Application {
 				}
 			}
 			else {
-				LOGGER.info("Skipping wayline edge v/w with index of :" + wayline.v + ", " + wayline.w);
+//				LOGGER.info("Skipping wayline edge v/w with index of :" + wayline.v + ", " + wayline.w);
 			}
 		});
 	}
@@ -296,7 +293,7 @@ public class DungeonVisualizer extends Application {
 				group.getChildren().add(line);
 			}
 			else {
-				LOGGER.info("Skipping edge v/w with index of :" + edge.v + ", " + edge.w);
+//				LOGGER.info("Skipping edge v/w with index of :" + edge.v + ", " + edge.w);
 			}
 		});
 	}
@@ -364,7 +361,7 @@ public class DungeonVisualizer extends Application {
 				group.getChildren().add(line);
 			}
 			else {
-				LOGGER.info("Skipping wayline edge v/w with index of :" + wayline.v + ", " + wayline.w);
+//				LOGGER.info("Skipping wayline edge v/w with index of :" + wayline.v + ", " + wayline.w);
 			}
 		});
 	}
@@ -386,7 +383,7 @@ public class DungeonVisualizer extends Application {
 				group.getChildren().add(line);
 			}
 			else {
-				LOGGER.info("Skipping edge v/w with index of :" + path.v + ", " + path.w);
+//				LOGGER.info("Skipping edge v/w with index of :" + path.v + ", " + path.w);
 			}
 		});
 	}

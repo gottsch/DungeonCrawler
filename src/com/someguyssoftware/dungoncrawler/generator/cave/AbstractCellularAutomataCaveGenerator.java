@@ -12,8 +12,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Vector;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+//import org.apache.logging.log4j.LogManager;
+//import org.apache.logging.log4j.Logger;
 
 import java.util.Map.Entry;
 
@@ -48,7 +48,7 @@ public abstract class AbstractCellularAutomataCaveGenerator implements ICellular
 	private static final List<Coords2D> DIRECTIONS;	
 	private static final List<Coords2D> TRAILING_DIRECTIONS;
 	
-	protected static final Logger logger = LogManager.getLogger();
+//	protected static final Logger logger = LogManager.getLogger();
 	
 	static {
 		DIRECTIONS = Arrays.asList(new Coords2D[] {
@@ -460,16 +460,16 @@ public abstract class AbstractCellularAutomataCaveGenerator implements ICellular
 			triangulator.triangulate();
 		}
 		catch(NotEnoughPointsException e) {
-			logger.warn("Not enough points where provided for triangulation. Level generation aborted.");
+//			logger.warn("Not enough points where provided for triangulation. Level generation aborted.");
 			return null; // TODO return empty list
 		}
 		catch(Exception e) {
-			if (caves !=null) logger.debug("rooms.size=" + caves.size());
-			else logger.debug("Rooms is NULL!");
-			if (pointSet != null) logger.debug("Pointset.size=" + pointSet.size());
-			else logger.debug("Pointset is NULL!");
+//			if (caves !=null) logger.debug("rooms.size=" + caves.size());
+//			else logger.debug("Rooms is NULL!");
+//			if (pointSet != null) logger.debug("Pointset.size=" + pointSet.size());
+//			else logger.debug("Pointset is NULL!");
 			
-			logger.error("Unable to triangulate: ", e);
+//			logger.error("Unable to triangulate: ", e);
 		}
 
 		// retrieve all the triangles from triangulation
