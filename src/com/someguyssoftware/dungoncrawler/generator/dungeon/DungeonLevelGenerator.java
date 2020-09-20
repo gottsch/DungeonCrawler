@@ -13,7 +13,8 @@ import java.util.Random;
 import java.util.Vector;
 import java.util.function.Supplier;
 
-//LOGGER;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
 
 import com.someguyssoftware.dungoncrawler.generator.Coords2D;
 import com.someguyssoftware.dungoncrawler.generator.ILevel;
@@ -40,7 +41,7 @@ import io.github.jdiemke.triangulation.Vector2D;
  */
 public class DungeonLevelGenerator implements ILevelGenerator {
 	
-//	protected static final LOGGER = LogManager.getLogger(DungeonLevelGenerator.class);
+	protected static final Logger LOGGER = LogManager.getLogger(DungeonLevelGenerator.class);
 	
 	private static final ILevel EMPTY_LEVEL = new DungeonLevel();
 
@@ -124,7 +125,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		
 		// test if start room can reach the end room
 		if (!breadthFirstSearch(start.getId(), end.getId(), orderedRooms, paths)) {
-			//LOGGER.info("A path doesn't exist from start room to end room on level.");
+			LOGGER.debug("A path doesn't exist from start room to end room on level.");
 			return EMPTY_LEVEL;
 		}
 			
@@ -169,13 +170,14 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 	}
 	
 	private boolean intersects(IDungeonRoom room, List<Edge> waylines, List<? extends INode> nodes) {
-//		System.out.printf("room to intersect with -> %s\n", room.getBox());
+//		LOGGER.debug("room to intersect with -> {}", room.getBox());
 		for (Edge edge : waylines) {
 			// create a temp rectangle with length only
 			Rectangle2D rectangle = new Rectangle2D(nodes.get(edge.v).getOrigin(), nodes.get(edge.w).getOrigin());
-//			System.out.printf("intersect rectangle -> %s\n", rectangle);
+//			LOGGER.debug("intersecting nodes n1-> {}, n2-> {}", nodes.get(edge.v), nodes.get(edge.w));
+//			LOGGER.debug("intersecting rectangle -> {}", rectangle);
 			if (rectangle.intersects(room.getBox()) || room.getBox().intersects(rectangle)) {
-//				System.out.println("intersects!");
+//				LOGGER.debug("intersects!");
 				return true;
 			}
 		}
@@ -209,12 +211,12 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 			// horizontal wayline (east-west)
 			if (checkHorizontalConnectivity(node1, node2)) {
 				Edge wayline = getHorizontalWayline(node1, node2, nodes, factory);		
-//				waylines.add(wayline);
+				waylines.add(wayline);
 			}
 			// vertical wayline (north-south)
 			else if (checkVerticalConnectivity(node1, node2)) {
 				Edge wayline = getVerticalWayline(node1, node2, nodes, factory);		
-//				waylines.add(wayline);
+				waylines.add(wayline);
 			}
 			// elbow wayline
 			else {
@@ -237,17 +239,19 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 				
 				// NOTE node2P is the "destination" or "joint" node, so it should be shared with both segments
 				INode node2P = createConnectorNode(new Coords2D(node2.getCenter().getX(), node1Center.getY()), nodes, factory);
-				Edge wayline1 = new Edge(node1P.getId(), node2P.getId(), 0/* node1.getCenter().getDistance(node2.getCenter())*/);
+				// NOTE the length of wayline1 is not exact as it is going from center to center, but it needs an approx length in order
+				// to calculate intersections
+				Edge wayline1 = new Edge(node1P.getId(), node2P.getId(), node1.getCenter().getDistance(node2.getCenter()));
 				
-				// room2 is down (postivie-z) of room 1
+				// room2 is up (postivie-y) of room 1
 				if (node2.getCenter().getY() > node1.getCenter().getY()) {
 					node1P = createConnectorNode(new Coords2D(node2.getCenter().getX(), node2.getMinY()+1), nodes, factory);
 				}
-				// room2 is up (negative-z) of room 1
+				// room2 is down (negative-y) of room 1
 				else {
 					node1P = createConnectorNode(new Coords2D(node2.getCenter().getX(), node2.getMaxY()-1), nodes, factory);
 				}
-				Edge wayline2 = new Edge(node1P.getId(), node2P.getId(), 0 /*node1.getCenter().getDistance(node2.getCenter())*/);
+				Edge wayline2 = new Edge(node1P.getId(), node2P.getId(), node1.getCenter().getDistance(node2.getCenter()));//node1P.getOrigin().getDistance(node2P.getOrigin())
 				
 				if (wayline1 != null && wayline2 != null) {
 					waylines.add(wayline1);
@@ -499,7 +503,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 			map.put(origin.getX() + ":" + origin.getY(), node);
 			// convert coords into vector2d for triangulation
 			Vector2D v = new Vector2D(origin.getX(), origin.getY());
-			//LOGGER.info(String.format("Room.id: %d = Vector2D: %s", node.getId(), v.toString()));
+//			LOGGER.debug(String.format("Room.id: %d = Vector2D: %s", node.getId(), v.toString()));
 			pointSet.add(v);
 		}
 
@@ -514,12 +518,19 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 			return edges;
 		}
 		catch(Exception e) {
-//			if (nodes !=null) Dungeons2.log.info("rooms.size=" + nodes.size());
-//			else Dungeons2.log.info("Rooms is NULL!");
-//			if (pointSet != null) Dungeons2.log.info("Pointset.size=" + pointSet.size());
-//			else Dungeons2.log.info("Pointset is NULL!");
-			
-			//LOGGER.error("Unable to triangulate: ", e);
+//			if (nodes !=null) {
+//				LOGGER.debug("rooms.size=" + nodes.size());
+//			}
+//			else {
+//				LOGGER.debug("Rooms is NULL!");
+//			}
+//			if (pointSet != null) {
+//				LOGGER.debug("Pointset.size=" + pointSet.size());
+//			}
+//			else {
+//				LOGGER.debug("Pointset is NULL!");
+//			}			
+			LOGGER.error("Unable to triangulate: ", e);
 		}
 
 		// retrieve all the triangles from triangulation
@@ -599,8 +610,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 
 		int meanArea = (int) totalArea / rooms.size();
 
-		System.out.printf("meanArea= %s \n", meanArea);
-		//LOGGER.info("meanArea = {}", meanArea);
+		LOGGER.debug("meanArea = {}", meanArea);
 		rooms.forEach(room -> {
 			if (room.getType() == NodeType.START || room.getType() == NodeType.END || room.getBox().getWidth() * room.getBox().getHeight() > meanArea) {
 				room.setRole(RoomRole.MAIN); //setMain(true);
@@ -862,11 +872,9 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		}
 		
         for (Edge e : edges) {
-//        	if (adj[e.v] == null) adj[e.v] = new LinkedList<>();
         	adj[e.v].add(e.w);
         	// add both directions to ensure all adjacencies are covered
-        	adj[e.w].add(e.v);
-//        	Dungeons2.log.debug("Adding edge " + e.v + " <-->  " + e.w);        	
+        	adj[e.w].add(e.v);     	
         }
 
 		// mark all the vertices as not visited(By default set as false)
@@ -882,7 +890,6 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		while (queue.size() != 0) {
 			// Dequeue a vertex from queue and print it
 			int s = queue.poll();
-			//LOGGER.debug("polling edge id: " + s);
 
 			// get all adjacent vertices of the dequeued vertex s
 			// if a adjacent has not been visited, then mark it

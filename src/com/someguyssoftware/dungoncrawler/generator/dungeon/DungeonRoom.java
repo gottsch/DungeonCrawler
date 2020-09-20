@@ -146,4 +146,9 @@ public class DungeonRoom implements IDungeonRoom {
 		return this;
 	}
 
+	@Override
+	public String toString() {
+		return "DungeonRoom [id=" + id + ", box=" + box + "]";
+	}
+
 }

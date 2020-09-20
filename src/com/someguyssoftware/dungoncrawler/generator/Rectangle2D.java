@@ -48,7 +48,7 @@ public class Rectangle2D {
 		this.width = Math.abs(coords1.getX() - coords2.getX());
 		this.height = Math.abs(coords1.getY() - coords2.getY());
 		this.width = width ==0 ? 1 : width;
-		this.height = height == 0 ? 1 : width;
+		this.height = height == 0 ? 1 : height;
 	}
 	
 	/**
