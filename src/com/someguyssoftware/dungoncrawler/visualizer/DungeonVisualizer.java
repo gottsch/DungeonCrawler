@@ -119,18 +119,22 @@ public class DungeonVisualizer extends Application {
 		Group group = new Group();
 
 		// create background
-		Rectangle bg = new Rectangle(0, 0, 480, 480);
+		Rectangle bg = new Rectangle(0, 0, dungeonGenerator.getWidth() * tileWidth, dungeonGenerator.getHeight() * tileHeight);
 		bg.setFill(Color.BLACK);
 		group.getChildren().add(bg);
 
 		// add spawn boundary
-		Rectangle spawnBoundary = new Rectangle(165, 165, 150, 150);
+		int midX = (dungeonGenerator.getWidth() * tileWidth) / 2;
+		int midY = (dungeonGenerator.getHeight() * tileHeight) / 2;
+		int spawnX = dungeonGenerator.getSpawnBoxWidth() * tileWidth;
+		int spawnY = dungeonGenerator.getSpawnBoxHeight() * tileHeight;
+		Rectangle spawnBoundary = new Rectangle(midX - (spawnX / 2), midY - (spawnY / 2), spawnX, spawnY);
+		
 		spawnBoundary.setFill(Color.YELLOW);
 		spawnBoundary.setOpacity(0.25);
 		spawnBoundary.setStroke(Color.DARKGOLDENROD);
 		group.getChildren().add(spawnBoundary);
 
-		//		Counter roomCounter = new Counter();
 		// TODO change to for each room, get the x,y and reference the cellmap.
 		level.getRooms().forEach(room -> {
 			if (room.getType() == NodeType.CONNECTOR) {
@@ -140,7 +144,6 @@ public class DungeonVisualizer extends Application {
 				return;
 			}
 
-			//			int roomIndex = roomCounter.add();
 			for (int x = 0; x < room.getBox().getWidth(); x++) {
 				for (int y = 0; y < room.getBox().getHeight(); y++) {
 					int absX = room.getOrigin().getX() + x ;
@@ -209,9 +212,8 @@ public class DungeonVisualizer extends Application {
 
 		});
 
-		// TODO values need to be calculated
 		// add a center rectangle
-		Rectangle center = new Rectangle(237, 237, 6, 6);
+		Rectangle center = new Rectangle(midX-3, midY-3, 6, 6); // center size is fixed.
 		center.setFill(Color.RED);
 		center.setStroke(Color.WHITE);
 		group.getChildren().add(center);
@@ -233,10 +235,25 @@ public class DungeonVisualizer extends Application {
 
 		addCorridors(level, group);
 
+		addExits(level, group);
 
 		// TEMP add chunk outlines (for Minecraft visuals)
 
 		mapBox.getChildren().add(group);
+	}
+
+	private void addExits(DungeonLevel level, Group group) {
+		// TODO Auto-generated method stub
+		level.getRooms().forEach(room -> {
+			if (!room.getExits().isEmpty()) {
+				room.getExits().forEach(exit -> {
+					Rectangle tile = new Rectangle(startX + (exit.getX() * tileWidth), (exit.getY() * tileHeight), tileWidth, tileHeight);
+					tile.setStroke(Color.BLACK);
+					tile.setFill(Color.CYAN);
+					group.getChildren().add(tile);
+				});
+			}
+		});
 	}
 
 	/**
@@ -244,7 +261,7 @@ public class DungeonVisualizer extends Application {
 	 * @param level2
 	 * @param group
 	 */
-	private void addCorridors(DungeonLevel level2, Group group) {
+	private void addCorridors(DungeonLevel level, Group group) {
 		level.getWaylines().forEach(wayline -> {
 			if (wayline.v < level.getRooms().size() && wayline.w < level.getRooms().size()) {
 				INode room1 = level.getRooms().get(wayline.v);
@@ -263,7 +280,7 @@ public class DungeonVisualizer extends Application {
 						s = room2;
 						e = room1;
 					}
-					for (int y = s.getOrigin().getY(); y < e.getOrigin().getY(); y++) {
+					for (int y = s.getOrigin().getY(); y <= e.getOrigin().getY(); y++) {
 						//						System.out.printf("draw at -> (%s, %s)\n",s.getOrigin().getX(), y);
 						Rectangle tile = new Rectangle(startX + (s.getOrigin().getX() * tileWidth), (y * tileHeight), tileWidth, tileHeight);
 						tile.setStroke(Color.YELLOW);
@@ -284,7 +301,7 @@ public class DungeonVisualizer extends Application {
 						s = room2;
 						e = room1;
 					}
-					for (int x = s.getOrigin().getX(); x < e.getOrigin().getX(); x++) {
+					for (int x = s.getOrigin().getX(); x <= e.getOrigin().getX(); x++) {
 						//						LOGGER.debug("draw at -> ({}, {})\n", x, s.getOrigin().getY());
 						Rectangle tile = new Rectangle(startX + (x * tileWidth) , (s.getOrigin().getY() * tileHeight), tileWidth, tileHeight);
 						tile.setStroke(Color.YELLOW);
@@ -430,6 +447,21 @@ public class DungeonVisualizer extends Application {
 		labels.add(heightLabel);
 		fields.add(heightField);
 		hBoxes.add(heightBox);
+		
+		// spawn box dimensions
+		Label spawnBoundaryWidthLabel = new Label("Width:");
+		TextField spawnBoundaryWidthField = new TextField("30");
+		HBox spawnBoundaryWidthBox = new HBox(spawnBoundaryWidthLabel, spawnBoundaryWidthField);
+		labels.add(spawnBoundaryWidthLabel);
+		fields.add(spawnBoundaryWidthField);
+		hBoxes.add(spawnBoundaryWidthBox);
+
+		Label spawnBoundaryHeightLabel = new Label("Height:");
+		TextField spawnBoundaryHeightField = new TextField("30");
+		HBox spawnBoundaryHeightBox = new HBox(spawnBoundaryHeightLabel, spawnBoundaryHeightField);
+		labels.add(spawnBoundaryHeightLabel);
+		fields.add(spawnBoundaryHeightField);
+		hBoxes.add(spawnBoundaryHeightBox);
 
 		// number of rooms
 		Label numRoomsLabel = new Label("# of Rooms:");
@@ -511,9 +543,11 @@ public class DungeonVisualizer extends Application {
 			@Override public void handle(ActionEvent e) {
 
 				level = (DungeonLevel) dungeonGenerator
+						.withSpawnBoxWidth(new Integer(spawnBoundaryWidthField.getText()))
+						.withSpawnBoxHeight(new Integer(spawnBoundaryHeightField.getText()))
 						.withNumberOfRooms(new Integer(numRoomsField.getText()))
 						.withMinRoomSize(Math.max(5, new Integer(minRoomSizeField.getText())))
-						.withMaxRoomSize(new Integer(maxRoomSizeField.getText()))
+						.withMaxRoomSize(Math.max(5, new Integer(maxRoomSizeField.getText())))
 						.withMovementFactor(new Integer(movementFactorField.getText()))
 						.withMeanFactor(new Double(meanFactorField.getText()))
 						.withPathFactor(new Double(pathFactorField.getText()))
@@ -533,7 +567,11 @@ public class DungeonVisualizer extends Application {
 		initButton.setOnAction(new EventHandler<ActionEvent>() {
 			@Override public void handle(ActionEvent e) {
 				level = (DungeonLevel) dungeonGenerator
+						.withSpawnBoxWidth(new Integer(spawnBoundaryWidthField.getText()))
+						.withSpawnBoxHeight(new Integer(spawnBoundaryHeightField.getText()))
 						.withNumberOfRooms(new Integer(numRoomsField.getText()))
+						.withMinRoomSize(Math.max(5, new Integer(minRoomSizeField.getText())))
+						.withMaxRoomSize(Math.max(5, new Integer(maxRoomSizeField.getText())))
 						.withMovementFactor(new Integer(movementFactorField.getText()))
 						.withMeanFactor(new Double(meanFactorField.getText()))
 						.withPathFactor(new Double(pathFactorField.getText()))
@@ -585,8 +623,7 @@ public class DungeonVisualizer extends Application {
 			box.setSpacing(5);
 		}
 
-		pane.getChildren().addAll(widthBox, heightBox, numRoomsBox, minRoomSizeBox, 
-				maxRoomSizeBox, movementFactorBox, meanFactorBox, pathFactorBox, 
+		pane.getChildren().addAll(widthBox, heightBox, spawnBoundaryWidthBox, spawnBoundaryHeightBox, numRoomsBox, 				minRoomSizeBox, maxRoomSizeBox, movementFactorBox, meanFactorBox, pathFactorBox, 
 				showNonRoomsBox, showEdgesBox, showPathsBox, showWaylinesBox, 
 				buttonsBox, buttonsBox2);
 	}

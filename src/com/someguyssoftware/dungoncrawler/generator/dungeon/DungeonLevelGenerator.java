@@ -16,6 +16,7 @@ import java.util.function.Supplier;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 
+import com.someguyssoftware.dungoncrawler.generator.Axis;
 import com.someguyssoftware.dungoncrawler.generator.Coords2D;
 import com.someguyssoftware.dungoncrawler.generator.ILevel;
 import com.someguyssoftware.dungoncrawler.generator.ILevelGenerator;
@@ -49,6 +50,8 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 	
 	private int width = 96;
 	private int height = 96;
+	private int spawnBoxWidth = 30;
+	private int spawnBoxHeight = 30;
 	private int numberOfRooms = 15;
 	private int minRoomSize = 5;
 	private int maxRoomSize = 15;
@@ -114,8 +117,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		 * (the actual sort order doesn't matter, as long as it keeps its order).
 		 */
 		// triangulate valid rooms
-		List<Edge> edges = null;
-		edges = triangulate(orderedRooms);
+		List<Edge> edges = triangulate(orderedRooms);
 		if (edges == null) {
 			return EMPTY_LEVEL;
 		}
@@ -132,22 +134,24 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		// add waylines
 		List<Edge> waylines = getWaylines(random, paths, orderedRooms, DungeonRoom::new);
 		
+		// add exits to main rooms
+		orderedRooms = addExits(waylines, orderedRooms);
+		
 		// TODO move to own method
 		// reintroduce minor rooms into ordered list. these are not auxiliary rooms until it is determine that they intersect with a corridor
-		rooms.forEach(room -> {
-//			LOGGER.debug("processing room -> {}, role -> {}\n", room.getId(), room.getRole());
-			if (room.getRole() != RoomRole.MAIN) {
-//				LOGGER.debug("Not main -> {}\n", room.getId());
-				room.setId(orderedRooms.size());
-//				room.setRole(RoomRole.AUXILIARY); NOT YET!
-				if (intersects(room, waylines, orderedRooms)) {
-					room.setRole(RoomRole.AUXILIARY);
-				}
-				orderedRooms.add(room);
-			}
-		});
-		
-		// TODO add exits
+		orderedRooms = selectAuxiliaryRooms(waylines, rooms, orderedRooms);
+//		rooms.forEach(room -> {
+////			LOGGER.debug("processing room -> {}, role -> {}\n", room.getId(), room.getRole());
+//			if (room.getRole() != RoomRole.MAIN) {
+////				LOGGER.debug("Not main -> {}\n", room.getId());
+//				room.setId(orderedRooms.size());
+////				room.setRole(RoomRole.AUXILIARY); NOT YET!
+//				if (intersects(room, waylines, orderedRooms)) {
+//					room.setRole(RoomRole.AUXILIARY);
+//				}
+//				orderedRooms.add(room);
+//			}
+//		});
 		
 		// TODO add elevation variance
 		
@@ -165,15 +169,93 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		return dungeonData;
 	}
 	
-	private boolean intersects(IDungeonRoom room, List<Edge> waylines, List<? extends INode> nodes) {
+	/**
+	 * 
+	 * @param waylines
+	 * @param rooms
+	 * @param orderedRooms
+	 * @return
+	 */
+	private List<IDungeonRoom> selectAuxiliaryRooms(List<Edge> waylines, List<IDungeonRoom> rooms,
+			List<IDungeonRoom> orderedRooms) {
+		List<IDungeonRoom> newOrderedRooms = new LinkedList<>(orderedRooms);
+		rooms.forEach(room -> {
+//			LOGGER.debug("processing room -> {}, role -> {}\n", room.getId(), room.getRole());
+			if (room.getRole() != RoomRole.MAIN) {
+//				LOGGER.debug("Not main -> {}\n", room.getId());
+				room.setId(orderedRooms.size());
+				if (intersects(room, waylines, orderedRooms)) {
+					room.setRole(RoomRole.AUXILIARY);
+				}
+				newOrderedRooms.add(room);
+			}
+		});
+		return newOrderedRooms;
+	}
+
+	/**
+	 * 
+	 * @param waylines
+	 * @param orderedRooms
+	 * @return
+	 */
+	private List<IDungeonRoom> addExits(List<Edge> waylines, List<IDungeonRoom> orderedRooms) {
+		final List<IDungeonRoom> newOrderedRooms = new LinkedList<>(orderedRooms);
+		waylines.forEach(wayline -> {
+			newOrderedRooms.forEach(room -> {
+				if (intersects(room, wayline, orderedRooms)) {
+					Coords2D coords1 = orderedRooms.get(wayline.v).getOrigin();
+					Coords2D coords2 = orderedRooms.get(wayline.w).getOrigin();
+					Axis axis = (coords1.getX() == coords2.getX())	? Axis.Y : Axis.X;
+					switch(axis) {
+					case X:
+						if (coords1.getX() < room.getMinX() || coords2.getX() < room.getMinX()) {
+							if ((coords1.getX() >= room.getMinX() && coords1.getX() <= room.getMaxX()) 
+									|| (coords2.getX() >= room.getMinX() && coords2.getX() <= room.getMaxX())) {
+								room.getExits().add(new Coords2D(room.getMinX(), coords1.getY()));
+							}
+							else {
+								room.getExits().add(new Coords2D(room.getMinX(), coords1.getY()));
+								room.getExits().add(new Coords2D(room.getMaxX(), coords1.getY()));
+							}
+						}
+						else {
+							room.getExits().add(new Coords2D(room.getMaxX(), coords1.getY()));
+						}
+						break;
+					case Y:
+						if (coords1.getY() < room.getMinY() || coords2.getY() < room.getMinY()) {
+							if ((coords1.getY() >= room.getMinY() && coords1.getY() <= room.getMaxY()) 
+									|| (coords2.getY() >= room.getMinY() && coords2.getY() <= room.getMaxY())) {
+								room.getExits().add(new Coords2D(coords1.getX(), room.getMinY()));
+							}
+							else {
+								room.getExits().add(new Coords2D(coords1.getX(),room.getMinY()));
+								room.getExits().add(new Coords2D(coords1.getX(),room.getMaxY()));
+							}
+						}
+						else {
+							room.getExits().add(new Coords2D(coords1.getX(),room.getMaxY()));
+						}
+						break;	
+					}
+				}
+			});
+		});
+		return newOrderedRooms;
+	}
+	
+	/**
+	 * 
+	 * @param room
+	 * @param waylines
+	 * @param rooms
+	 * @return
+	 */
+	private boolean intersects(IDungeonRoom room, List<Edge> waylines, List<? extends IDungeonRoom> rooms) {
 //		LOGGER.debug("room to intersect with -> {}", room.getBox());
 		for (Edge edge : waylines) {
-			// create a temp rectangle with length only
-			Rectangle2D rectangle = new Rectangle2D(nodes.get(edge.v).getOrigin(), nodes.get(edge.w).getOrigin());
-//			LOGGER.debug("intersecting nodes n1-> {}, n2-> {}", nodes.get(edge.v), nodes.get(edge.w));
-//			LOGGER.debug("intersecting rectangle -> {}", rectangle);
-			if (rectangle.intersects(room.getBox()) || room.getBox().intersects(rectangle)) {
-//				LOGGER.debug("intersects!");
+			if (intersects(room, edge, rooms)) {
 				return true;
 			}
 		}
@@ -182,12 +264,28 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 
 	/**
 	 * 
+	 * @param room
+	 * @param wayline
+	 * @param nodes
+	 * @return
+	 */
+	private boolean intersects(IDungeonRoom room, Edge wayline, List<? extends IDungeonRoom> nodes) {
+		Rectangle2D rectangle = new Rectangle2D(nodes.get(wayline.v).getOrigin(), nodes.get(wayline.w).getOrigin());
+		if (rectangle.intersects(room.getBox()) || room.getBox().intersects(rectangle)) {
+			return true;
+		}
+		return false;
+	}
+	
+	/**
+	 * Waylines is a dungeon method, not a graph method, so use IDungeonRoom instead of INodes
 	 * @param rand
 	 * @param paths
 	 * @param nodes
 	 * @param factory
 	 * @return
 	 */
+	// TODO rename waylines -> corridors
 	protected List<Edge> getWaylines(Random rand, List<Edge> paths, List<? extends INode> nodes, Supplier<? extends INode> factory) {
 		
 		/*
@@ -258,6 +356,13 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		return waylines;
 	}
 	
+	/**
+	 * 
+	 * @param origin
+	 * @param nodes
+	 * @param factory
+	 * @return
+	 */
 	public INode createConnectorNode(Coords2D origin, List<? extends INode> nodes, Supplier<? extends INode> factory) {
 		@SuppressWarnings("unchecked")
 		List<INode> referencedNodes = (List<INode>)(List<?>)nodes;
@@ -272,7 +377,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 	}
 	
 	/**
-	 * 
+	 * Dungeon Method
 	 * @param node1
 	 * @param node2
 	 * @return
@@ -288,7 +393,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 	}
 	
 	/**
-	 * 
+	 * Dungeon Method
 	 * @param node1
 	 * @param node2
 	 * @return
@@ -305,7 +410,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 	}
 	
 	/**
-	 * 
+	 * Dungeon method
 	 * @param node1
 	 * @param node2
 	 * @param nodes
@@ -346,7 +451,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 	}
 
 	/**
-	 * 
+	 * Dungeon method
 	 * @param node1
 	 * @param node2
 	 * @param nodes
@@ -606,7 +711,6 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 
 		int meanArea = (int) totalArea / rooms.size();
 
-		LOGGER.debug("meanArea = {}", meanArea);
 		rooms.forEach(room -> {
 			if (room.getType() == NodeType.START || room.getType() == NodeType.END || room.getBox().getWidth() * room.getBox().getHeight() > meanArea) {
 				room.setRole(RoomRole.MAIN); //setMain(true);
@@ -800,7 +904,7 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		Coords2D centerPoint = new Coords2D(width/2, height / 2);
 
 		// TODO this needs to be defined somewhere
-		Rectangle2D boundingBox = new Rectangle2D(0, 0, 30, 30);	
+		Rectangle2D boundingBox = new Rectangle2D(0, 0, spawnBoxWidth, spawnBoxHeight);	
 		
 		IDungeonRoom startRoom = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
 		startRoom
@@ -839,12 +943,12 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 	private IDungeonRoom generateRoom(Random random, Coords2D centerPoint, Rectangle2D boundingBox, int minRoomSize2,
 			int maxRoomSize2) {
 		
-		int sizeX = random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
-		int sizeZ = random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
+		int sizeX = maxRoomSize == minRoomSize ? minRoomSize : random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
+		int sizeY = maxRoomSize == minRoomSize ? minRoomSize : random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
 		int offsetX = (random.nextInt(boundingBox.getWidth()) - (boundingBox.getWidth()/2)) - (sizeX / 2);
-		int offsetZ = (random.nextInt(boundingBox.getHeight()) - (boundingBox.getHeight()/2)) - (sizeZ / 2);
+		int offsetY = (random.nextInt(boundingBox.getHeight()) - (boundingBox.getHeight()/2)) - (sizeY / 2);
 		
-		IDungeonRoom room = new DungeonRoom(new Coords2D(centerPoint.getX() + offsetX, centerPoint.getY() + offsetZ), sizeX, sizeZ);
+		IDungeonRoom room = new DungeonRoom(new Coords2D(centerPoint.getX() + offsetX, centerPoint.getY() + offsetY), sizeX, sizeY);
 		return room;
 	}
 
@@ -923,6 +1027,14 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 		return height;
 	}
 	
+	public int getSpawnBoxWidth() {
+		return spawnBoxWidth;
+	}
+	
+	public int getSpawnBoxHeight() {
+		return spawnBoxHeight;
+	}
+	
 	public int getNumberOfRooms() {
 		return numberOfRooms;
 	}
@@ -956,6 +1068,16 @@ public class DungeonLevelGenerator implements ILevelGenerator {
 	@Override
 	public ILevelGenerator withHeight(int height) {
 		this.height = height;
+		return this;
+	}
+	
+	public DungeonLevelGenerator withSpawnBoxWidth(int width) {
+		this.spawnBoxWidth = width;
+		return this;
+	}
+	
+	public DungeonLevelGenerator withSpawnBoxHeight(int height) {
+		this.spawnBoxHeight = height;
 		return this;
 	}
 

@@ -3,6 +3,9 @@
  */
 package com.someguyssoftware.dungoncrawler.generator.dungeon;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.someguyssoftware.dungoncrawler.generator.Coords2D;
 import com.someguyssoftware.dungoncrawler.generator.INode;
 import com.someguyssoftware.dungoncrawler.generator.NodeType;
@@ -19,7 +22,8 @@ public class DungeonRoom implements IDungeonRoom {
 	private int maxDegrees;
 	private NodeType nodeType;
 	private RoomRole roomRole;
-	private boolean isMain;
+//	private boolean isMain;
+	private List<Coords2D> exits;
 	
 	/**
 	 * Empty constructor
@@ -149,6 +153,19 @@ public class DungeonRoom implements IDungeonRoom {
 	@Override
 	public String toString() {
 		return "DungeonRoom [id=" + id + ", box=" + box + "]";
+	}
+
+	@Override
+	public List<Coords2D> getExits() {
+		if (exits == null) {
+			exits = new ArrayList<>();
+		}
+		return exits;
+	}
+
+	@Override
+	public void setExits(List<Coords2D> exits) {
+		this.exits = exits;
 	}
 
 }

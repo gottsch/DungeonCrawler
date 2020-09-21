@@ -3,6 +3,9 @@
  */
 package com.someguyssoftware.dungoncrawler.generator.dungeon;
 
+import java.util.List;
+
+import com.someguyssoftware.dungoncrawler.generator.Coords2D;
 import com.someguyssoftware.dungoncrawler.generator.INode;
 import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
 
@@ -19,4 +22,8 @@ public interface IDungeonRoom extends INode {
 	
 	RoomRole getRole();
 	IDungeonRoom setRole(RoomRole roomRole);
+	
+	List<Coords2D> getExits();
+	void setExits(List<Coords2D> exits);
+	
 }

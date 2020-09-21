@@ -107,7 +107,7 @@ public class Rectangle2D {
 	}
 
 	public int getMaxX() {
-		return getOrigin().getX() + getWidth();
+		return getOrigin().getX() + getWidth() - 1;
 	}
 
 	public int getMinY() {
@@ -115,7 +115,7 @@ public class Rectangle2D {
 	}
 
 	public int getMaxY() {
-		return getOrigin().getY() + height;
+		return getOrigin().getY() + getHeight() - 1;
 	}
 
 	public Coords2D getOrigin() {

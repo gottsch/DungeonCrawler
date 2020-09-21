@@ -19,6 +19,7 @@ public interface INode {
     public NodeType getType();
     public INode setType(NodeType type);
     
+    // TODO rethink these - they probably belong in IDungeonRoom as a Node doesn't have a size.
     /*
      * convenience methods
      */
