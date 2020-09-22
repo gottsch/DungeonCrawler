@@ -96,17 +96,6 @@ public class DungeonRoom implements IDungeonRoom {
 	public int getMaxY() {
 		return this.getBox().getMaxY();
 	}
-	
-//	@Override
-//	public boolean isMain() {
-//		return isMain;
-//	}
-	
-//	@Override
-//	public IDungeonRoom setMain(boolean isMain) {
-//		this.isMain = isMain;
-//		return this;
-//	}
 
 	@Override
 	public NodeType getType() {

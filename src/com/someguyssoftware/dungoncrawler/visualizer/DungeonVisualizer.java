@@ -71,6 +71,8 @@ public class DungeonVisualizer extends Application {
 	private int tileWidth = 5;
 	private int tileHeight = 5;
 
+	private boolean showCenterPoint = false;
+	private boolean showSpawnBoundary = false;
 	private boolean showNonRooms = true;
 	private boolean showEdges = false;
 	private boolean showPaths = false;
@@ -118,28 +120,33 @@ public class DungeonVisualizer extends Application {
 		// container for all the visual elements
 		Group group = new Group();
 
+		// get the center of the map
+		int midX = (dungeonGenerator.getWidth() * tileWidth) / 2;
+		int midY = (dungeonGenerator.getHeight() * tileHeight) / 2;
+		
 		// create background
 		Rectangle bg = new Rectangle(0, 0, dungeonGenerator.getWidth() * tileWidth, dungeonGenerator.getHeight() * tileHeight);
 		bg.setFill(Color.BLACK);
 		group.getChildren().add(bg);
 
 		// add spawn boundary
-		int midX = (dungeonGenerator.getWidth() * tileWidth) / 2;
-		int midY = (dungeonGenerator.getHeight() * tileHeight) / 2;
-		int spawnX = dungeonGenerator.getSpawnBoxWidth() * tileWidth;
-		int spawnY = dungeonGenerator.getSpawnBoxHeight() * tileHeight;
-		Rectangle spawnBoundary = new Rectangle(midX - (spawnX / 2), midY - (spawnY / 2), spawnX, spawnY);
+		if (showSpawnBoundary) {
+			int spawnX = dungeonGenerator.getSpawnBoxWidth() * tileWidth;
+			int spawnY = dungeonGenerator.getSpawnBoxHeight() * tileHeight;
+			Rectangle spawnBoundary = new Rectangle(midX - (spawnX / 2), midY - (spawnY / 2), spawnX, spawnY);
+			
+			spawnBoundary.setFill(Color.YELLOW);
+			spawnBoundary.setOpacity(0.25);
+			spawnBoundary.setStroke(Color.DARKGOLDENROD);
+			group.getChildren().add(spawnBoundary);
+		}
 		
-		spawnBoundary.setFill(Color.YELLOW);
-		spawnBoundary.setOpacity(0.25);
-		spawnBoundary.setStroke(Color.DARKGOLDENROD);
-		group.getChildren().add(spawnBoundary);
-
-		// TODO change to for each room, get the x,y and reference the cellmap.
+		/*
+		 *  TODO change to for each room, get the x,y and reference the cellmap.
+		 *  the cellmap has to be properly filled first though
+		 *  and the cellmap is going to be updated to contain a List of object values instead of just booleans
+		 */
 		level.getRooms().forEach(room -> {
-			if (room.getType() == NodeType.CONNECTOR) {
-				return;
-			}
 			if (!showNonRooms && room.getRole() != RoomRole.MAIN && room.getRole() != RoomRole.AUXILIARY) {
 				return;
 			}
@@ -166,35 +173,14 @@ public class DungeonVisualizer extends Application {
 						else {
 							tile.setStroke(color);
 						}
-
-						//						if (level.getCellMap()[absX][absY]) {
-						//							tile.setFill(ROCK_COLOR);
-						//						}
-						//						else {
-						//							if (room.isMain()) {
-						//								switch(room.getType()) {
-						//								case START:
-						//									tile.setStroke(START_ROOM_COLOR);
-						//									break;
-						//								case END:
-						//									tile.setStroke(END_ROOM_COLOR);
-						//									break;
-						//								default:
-						//									tile.setStroke(MAIN_ROOM_COLOR);
-						//								}
-						//							}
-						//							else {
-						//								tile.setStroke(MINOR_ROOM_COLOR);
-						//							}
-						//						}
-
 						group.getChildren().add(tile);
 					}
 				}
 			}
 
 			// add ids
-			Text text = new Text(startX + (room.getOrigin().getX() * tileWidth) + 2, startY + (room.getOrigin().getY() * tileHeight) + 10, String.valueOf(room.getId()));
+			Text text = new Text(startX + (room.getOrigin().getX() * tileWidth) + 2, 
+					startY + (room.getOrigin().getY() * tileHeight) + 10, String.valueOf(room.getId()));
 			text.setFont(new Font(10));
 			text.setFill(Color.ANTIQUEWHITE);
 			group.getChildren().add(text);
@@ -213,11 +199,13 @@ public class DungeonVisualizer extends Application {
 		});
 
 		// add a center rectangle
-		Rectangle center = new Rectangle(midX-3, midY-3, 6, 6); // center size is fixed.
-		center.setFill(Color.RED);
-		center.setStroke(Color.WHITE);
-		group.getChildren().add(center);
-
+		if (showCenterPoint) {
+			Rectangle center = new Rectangle(midX-3, midY-3, 6, 6); // center size is fixed.
+			center.setFill(Color.RED);
+			center.setStroke(Color.WHITE);
+			group.getChildren().add(center);
+		}
+		
 		// add edges
 		if (showEdges) {
 			addEdges(level, group);
@@ -233,6 +221,7 @@ public class DungeonVisualizer extends Application {
 			addWaylines(level, group);
 		}
 
+		// TODO do differently
 		addCorridors(level, group);
 
 		addExits(level, group);
@@ -242,8 +231,12 @@ public class DungeonVisualizer extends Application {
 		mapBox.getChildren().add(group);
 	}
 
+	/**
+	 * 
+	 * @param level
+	 * @param group
+	 */
 	private void addExits(DungeonLevel level, Group group) {
-		// TODO Auto-generated method stub
 		level.getRooms().forEach(room -> {
 			if (!room.getExits().isEmpty()) {
 				room.getExits().forEach(exit -> {
@@ -263,26 +256,26 @@ public class DungeonVisualizer extends Application {
 	 */
 	private void addCorridors(DungeonLevel level, Group group) {
 		level.getWaylines().forEach(wayline -> {
-			if (wayline.v < level.getRooms().size() && wayline.w < level.getRooms().size()) {
-				INode room1 = level.getRooms().get(wayline.v);
-				INode room2 = level.getRooms().get(wayline.w);
+			if (wayline.getConnector1() != null && wayline.getConnector2() != null) {
+				Coords2D connector1 = wayline.getConnector1();
+				Coords2D connector2 = wayline.getConnector2();
 				// draw vertically
-				if (room1.getOrigin().getX() == room2.getOrigin().getX()) {
-					//					System.out.printf("drawing wayline from -> %s to %s\n", room1.getId(), room2.getId());
+				if (connector1.getX() == connector2.getX()) {
+					//	LOGGER.debug("drawing wayline from -> {} to {}", room1.getId(), room2.getId());
 					// order rooms for drawing
-					INode s = null;
-					INode e = null;
-					if (room1.getOrigin().getY() < room2.getOrigin().getY()) {
-						s = room1;
-						e = room2;
+					Coords2D s = null;
+					Coords2D e = null;
+					if (connector1.getY() < connector2.getY()) {
+						s = connector1;
+						e = connector2;
 					}
 					else {
-						s = room2;
-						e = room1;
+						s = connector2;
+						e = connector1;
 					}
-					for (int y = s.getOrigin().getY(); y <= e.getOrigin().getY(); y++) {
-						//						System.out.printf("draw at -> (%s, %s)\n",s.getOrigin().getX(), y);
-						Rectangle tile = new Rectangle(startX + (s.getOrigin().getX() * tileWidth), (y * tileHeight), tileWidth, tileHeight);
+					for (int y = s.getY(); y <= e.getY(); y++) {
+						//						LOGGER.debug("draw at -> ({}, {})",s.getOrigin().getX(), y);
+						Rectangle tile = new Rectangle(startX + (s.getX() * tileWidth), (y * tileHeight), tileWidth, tileHeight);
 						tile.setStroke(Color.YELLOW);
 						tile.setFill(Color.BLACK);
 						group.getChildren().add(tile);
@@ -290,20 +283,20 @@ public class DungeonVisualizer extends Application {
 				}
 				// horizontally
 				else {
-					// order rooms for drawing
-					INode s = null;
-					INode e = null;
-					if (room1.getOrigin().getX() < room2.getOrigin().getX()) {
-						s = room1;
-						e = room2;
+					// order connectors for drawing
+					Coords2D s = null;
+					Coords2D e = null;
+					if (connector1.getX() < connector2.getX()) {
+						s = connector1;
+						e = connector2;
 					}
 					else {
-						s = room2;
-						e = room1;
+						s = connector2;
+						e = connector1;
 					}
-					for (int x = s.getOrigin().getX(); x <= e.getOrigin().getX(); x++) {
+					for (int x = s.getX(); x <= e.getX(); x++) {
 						//						LOGGER.debug("draw at -> ({}, {})\n", x, s.getOrigin().getY());
-						Rectangle tile = new Rectangle(startX + (x * tileWidth) , (s.getOrigin().getY() * tileHeight), tileWidth, tileHeight);
+						Rectangle tile = new Rectangle(startX + (x * tileWidth) , (s.getY() * tileHeight), tileWidth, tileHeight);
 						tile.setStroke(Color.YELLOW);
 						tile.setFill(Color.BLACK);
 						group.getChildren().add(tile);
@@ -357,7 +350,7 @@ public class DungeonVisualizer extends Application {
 	 */
 	private Paint selectRoomColor(IDungeonRoom room) {
 		Paint color = null;
-		if (room.getRole() == RoomRole.MAIN/*isMain()*/) {
+		if (room.getRole() == RoomRole.MAIN) {
 			switch(room.getType()) {
 			case START:
 				color = START_ROOM_COLOR;
@@ -385,11 +378,11 @@ public class DungeonVisualizer extends Application {
 	 */
 	private void addWaylines(DungeonLevel level, Group group) {
 		level.getWaylines().forEach(wayline -> {
-			if (wayline.v < level.getRooms().size() && wayline.w < level.getRooms().size()) {
-				INode room1 = level.getRooms().get(wayline.v);
-				INode room2 = level.getRooms().get(wayline.w);	
-				Line line = new Line(room1.getCenter().getX() * tileWidth, room1.getCenter().getY() * tileHeight,
-						room2.getCenter().getX() * tileWidth, room2.getCenter().getY() * tileHeight);
+			if (wayline.getConnector1() != null && wayline.getConnector2() != null) {
+				Coords2D connector1 = wayline.getConnector1();
+				Coords2D connector2 = wayline.getConnector2();
+				Line line = new Line(connector1.getX() * tileWidth, connector1.getY() * tileHeight,
+						connector2.getX() * tileWidth, connector2.getY() * tileHeight);
 				line.setStroke(Color.YELLOW);
 				line.setStrokeWidth(3.0);
 				group.getChildren().add(line);
@@ -511,6 +504,16 @@ public class DungeonVisualizer extends Application {
 		fields.add(pathFactorField);
 		hBoxes.add(pathFactorBox);
 
+		// show center point
+		HBox showCenterPointBox = addToggle("Show Center Point:", showCenterPoint, labels, hBoxes, (visualizer, bool) -> {
+			visualizer.setShowCenterPoint(bool);
+		});
+		
+		// show spawn boundary
+		HBox showSpawnBoundaryBox = addToggle("Show Spawn Boundary:", showSpawnBoundary, labels, hBoxes, (visualizer, bool) -> {
+			visualizer.setShowSpawnBoundary(bool);
+		});
+		
 		// show non-rooms
 		HBox showNonRoomsBox = addToggle("Show Non-Selected Rooms:", showNonRooms, labels, hBoxes, (visualizer, bool) -> {
 			visualizer.setShowNonRooms(bool);
@@ -554,8 +557,6 @@ public class DungeonVisualizer extends Application {
 						.withHeight(new Integer(widthField.getText()))
 						.withWidth(new Integer(heightField.getText()))    	    			
 						.build();
-
-				center = dungeonGenerator.getCenter(level.getRooms());
 
 				buildMapPane(mapBox, level);
 			}
@@ -624,7 +625,7 @@ public class DungeonVisualizer extends Application {
 		}
 
 		pane.getChildren().addAll(widthBox, heightBox, spawnBoundaryWidthBox, spawnBoundaryHeightBox, numRoomsBox, 				minRoomSizeBox, maxRoomSizeBox, movementFactorBox, meanFactorBox, pathFactorBox, 
-				showNonRoomsBox, showEdgesBox, showPathsBox, showWaylinesBox, 
+				showCenterPointBox, showSpawnBoundaryBox, showNonRoomsBox, showEdgesBox, showPathsBox, showWaylinesBox, 
 				buttonsBox, buttonsBox2);
 	}
 
@@ -707,5 +708,21 @@ public class DungeonVisualizer extends Application {
 
 	public void setShowNonRooms(boolean showNonRooms) {
 		this.showNonRooms = showNonRooms;
+	}
+
+	public boolean isShowCenterPoint() {
+		return showCenterPoint;
+	}
+
+	public void setShowCenterPoint(boolean showCenterPoint) {
+		this.showCenterPoint = showCenterPoint;
+	}
+
+	public boolean isShowSpawnBoundary() {
+		return showSpawnBoundary;
+	}
+
+	public void setShowSpawnBoundary(boolean showSpawnBoundary) {
+		this.showSpawnBoundary = showSpawnBoundary;
 	}
 }

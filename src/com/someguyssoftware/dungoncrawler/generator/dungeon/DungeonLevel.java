@@ -35,7 +35,7 @@ public class DungeonLevel implements ILevel {
 	
 	private List<Edge> paths;
 	
-	private List<Edge> waylines;
+	private List<Wayline> waylines;
 	
 	public boolean[][] getCellMap() {
 		return cellMap;
@@ -100,11 +100,11 @@ public class DungeonLevel implements ILevel {
 		this.paths = paths;
 	}
 
-	public List<Edge> getWaylines() {
+	public List<Wayline> getWaylines() {
 		return waylines;
 	}
 
-	public void setWaylines(List<Edge> waylines) {
+	public void setWaylines(List<Wayline> waylines) {
 		this.waylines = waylines;
 	}
 	
