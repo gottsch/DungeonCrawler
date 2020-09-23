@@ -3,7 +3,6 @@
  */
 package com.someguyssoftware.dungoncrawler.generator.dungeon;
 
-import com.someguyssoftware.dungoncrawler.generator.Coords2D;
 import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
 
 /**
@@ -11,31 +10,31 @@ import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
  *
  */
 public class Wayline {
-	private Coords2D connector1;
-	private Coords2D connector2;
+	private WayConnector connector1;
+	private WayConnector connector2;
 	private Rectangle2D box;
 	
 	public Wayline() {}
 	
-	public Wayline(Coords2D connector1, Coords2D connector2) {
+	public Wayline(WayConnector connector1, WayConnector connector2) {
 		this.connector1 = connector1;
 		this.connector2 = connector2;
-		this.box = new Rectangle2D(connector1, connector2);
+		this.box = new Rectangle2D(connector1.getCoords(), connector2.getCoords());
 	}
 
-	public Coords2D getConnector1() {
+	public WayConnector getConnector1() {
 		return connector1;
 	}
 
-	public void setConnector1(Coords2D connector1) {
+	public void setConnector1(WayConnector connector1) {
 		this.connector1 = connector1;
 	}
 
-	public Coords2D getConnector2() {
+	public WayConnector getConnector2() {
 		return connector2;
 	}
 
-	public void setConnector2(Coords2D connector2) {
+	public void setConnector2(WayConnector connector2) {
 		this.connector2 = connector2;
 	}
 
@@ -49,5 +48,10 @@ public class Wayline {
 
 	public void setBox(Rectangle2D box) {
 		this.box = box;
+	}
+
+	@Override
+	public String toString() {
+		return "Wayline [connector1=" + connector1 == null ? "null" : connector1 + ", connector2=" + connector2 == null ? "null" : connector2 + ", box=" + box == null ? "null" : box + "]";
 	}
 }

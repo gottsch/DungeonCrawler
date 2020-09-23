@@ -11,10 +11,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Vector;
-import java.util.function.Supplier;
 
-import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import com.someguyssoftware.dungoncrawler.generator.AbstractGraphLevelGenerator;
 import com.someguyssoftware.dungoncrawler.generator.Axis;
@@ -66,8 +65,8 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		Random random = new Random();
 		boolean[][] cellMap = initMap(random);
 
-		List<IDungeonRoom> rooms = initRooms(random);
-		Map<Integer, IDungeonRoom> roomMap = mapRooms(rooms);
+		List<IRoom> rooms = initRooms(random);
+		Map<Integer, IRoom> roomMap = mapRooms(rooms);
 		cellMap = updateCellMap(cellMap, rooms);
 		
 		dungeonData.setCellMap(cellMap);
@@ -76,6 +75,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		dungeonData.setEdges(new ArrayList<Edge>());
 		dungeonData.setPaths(new ArrayList<Edge>());
 		dungeonData.setWaylines(new ArrayList<Wayline>());
+		dungeonData.setCorridors(new ArrayList<Corridor>());
 		return dungeonData;
 	}
 	
@@ -85,22 +85,22 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		DungeonLevel dungeonData = (DungeonLevel) init();
 		Random random = new Random();
 		boolean[][] cellMap = dungeonData.getCellMap();
-		List<IDungeonRoom> rooms = dungeonData.getRooms();
+		List<IRoom> rooms = dungeonData.getRooms();
 		
 		// separate rooms
-		rooms = (List<IDungeonRoom>)(List<?>)separateNodes(rooms, movementFactor);
+		rooms = (List<IRoom>)(List<?>)separateNodes(rooms, movementFactor);
 		
 		// select main rooms
-		List<IDungeonRoom> mainRooms = selectMainRooms(rooms, meanFactor);
+		List<IRoom> mainRooms = selectMainRooms(rooms, meanFactor);
 		
 		/*
 		 * because of how DelaunayTriangulator works, the main rooms need to in a ordered list
 		 * AND their ids need to be reset according to their position in the list
 		 */
-		IDungeonRoom start = null;
-		IDungeonRoom end = null; // TODO can be a list (multiple end rooms, one is primary the others are decoys)
-		List<IDungeonRoom> orderedRooms = new LinkedList<>();
-		for(IDungeonRoom room : mainRooms) {
+		IRoom start = null;
+		IRoom end = null; // TODO can be a list (multiple end rooms, one is primary the others are decoys)
+		List<IRoom> orderedRooms = new LinkedList<>();
+		for(IRoom room : mainRooms) {
 			orderedRooms.add(room);
 			room.setId(orderedRooms.size()-1);
 			if (room.getType() == NodeType.START) {
@@ -139,6 +139,8 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		// add waylines
 		List<Wayline> waylines = getWaylines(random, paths, orderedRooms);
 		
+		List<Corridor> corridors = getCorridors(waylines);
+		
 		// add exits to main rooms
 		orderedRooms = addExits(waylines, orderedRooms);
 
@@ -157,10 +159,152 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		dungeonData.setEdges(edges);
 		dungeonData.setPaths(paths);
 		dungeonData.getWaylines().addAll(waylines);
-		
+		dungeonData.getCorridors().addAll(corridors);
 		return dungeonData;
 	}
 	
+	/**
+	 * 
+	 * @param waylines
+	 * @return
+	 */
+	public List<Corridor> getCorridors(List<Wayline> waylines) {
+		List<Corridor> corridors = new ArrayList<>();
+		waylines.forEach(wayline -> {
+			Axis axis = (wayline.getConnector1().getCoords().getX() == wayline.getConnector2().getCoords().getX())	? Axis.Y : Axis.X;
+			
+			// setup
+			WayConnector connector1 = null;
+			WayConnector connector2 = null;
+			Coords2D coords1 = null;
+			Coords2D coords2 = null;
+			List<Coords2D> exits = new ArrayList<>();
+			
+			// TODO FUTURE determine the max width of a corridor (by odd numbers: 3, 5, 7) (probably not bigger than 5 else it isn't a corridor anymore)
+			int width = 3;
+			
+			switch(axis) {
+			case X:
+				// order the connectors
+				if (wayline.getConnector1().getCoords().getX() <= wayline.getConnector2().getCoords().getX()) {
+					connector1 = wayline.getConnector1();
+					connector2 = wayline.getConnector2();
+				}
+				else {
+					connector1 = wayline.getConnector2();
+					connector2 = wayline.getConnector1();
+				}
+
+				// new coords so as to not override current waylines connector coords
+				coords1 = new Coords2D(connector1.getCoords());
+				coords2 = new Coords2D(connector2.getCoords());
+								
+				// adjust the position/widths. ie. the corridor is adjusted to not overlap connecting into rooms, but instead if joint so the corridor is properly drawn
+				if (connector1.getRoom() != null) {
+					// edge of corridor equals edge of room
+					coords1.setX(connector1.getRoom().getMaxX());
+					/*
+					 * add exit to corridor
+					 * add before altering the width of the corridor so it aligns with the room
+					 */
+					exits.add(new Coords2D(coords1.getX(), coords1.getY()));
+				}
+				else {
+					// grow length by at least 1 
+					coords1.setX(coords1.getX() - 1);
+				}
+				
+				if (connector2.getRoom() != null) {
+					// edge of corridor equals edge of room
+					coords2.setX(connector2.getRoom().getMinX());
+					/*
+					 * add exit to corridor
+					 * add before altering the width of the corridor so it aligns with the room
+					 */
+					exits.add(new Coords2D(coords2.getX(), coords2.getY()));
+				}
+				else {
+					// grow length by at least 1 
+					coords2.setX(coords2.getX() + 1);
+				}				
+				
+				// grow width by 2 to make at least 3 wide (TODO able to have wider corridors)
+				coords1.setY(coords1.getY() - 1);
+				coords2.setY(coords2.getY() + 1);
+				break;
+				
+			case Y:
+				if (wayline.getConnector1().getCoords().getY() <= wayline.getConnector2().getCoords().getY()) {
+					connector1 = wayline.getConnector1();
+					connector2 = wayline.getConnector2();
+				}
+				else {
+					connector1 = wayline.getConnector2();
+					connector2 = wayline.getConnector1();
+				}
+				
+				// new coords so as to not override current waylines connector coords
+				coords1 = new Coords2D(connector1.getCoords());
+				coords2 = new Coords2D(connector2.getCoords());
+				
+				if (connector1.getRoom() != null) {
+					coords1.setY(connector1.getRoom().getMaxY());
+					exits.add(new Coords2D(coords1.getX(), coords1.getY()));
+				}
+				else {
+					coords1.setY(coords1.getY() - 1);
+				}
+				
+				if (connector2.getRoom() != null) {
+					coords2.setY(connector2.getRoom().getMinY());
+					exits.add(new Coords2D(coords2.getX(), coords2.getY()));
+				}
+				else {
+					coords2.setY(coords2.getY() + 1);
+				}
+				coords1.setX(coords1.getX() - 1);
+				coords2.setX(coords2.getX() + 1);
+			}
+			
+			// create corridor
+			Corridor corridor = new Corridor(new Rectangle2D(coords1, coords2));
+			corridor.setAxis(axis);
+			corridor.setExits(exits);
+			// add corridor to list
+			corridors.add(corridor);
+		});
+		
+		// addExits between corridors
+		corridors.forEach(corridor1 -> {
+			corridors.forEach(corridor2 -> {
+				if (corridor1 == corridor2) {
+					return;
+				}
+				if (corridor1.getBox().intersects(corridor2.getBox())) {
+					// typical/expected scenario - opposite axis; same axis we will want to ignore
+					if (corridor1.getAxis() == Axis.X && corridor2.getAxis() == Axis.Y) {
+						if (corridor2.getBox().getMinX() > corridor1.getBox().getMinX() && corridor2.getBox().getMinX() < corridor1.getBox().getMaxX()) {
+							corridor1.getExits().add(new Coords2D(corridor2.getBox().getMinX(), corridor1.getBox().getCenterY()));
+						}
+						else {
+							corridor1.getExits().add(new Coords2D(corridor2.getBox().getMaxX(), corridor1.getBox().getCenterY()));
+						}
+					}
+					else if (corridor1.getAxis() == Axis.Y && corridor2.getAxis() == Axis.X) {
+						if (corridor2.getBox().getMinY() > corridor1.getBox().getMinY() && corridor2.getBox().getMinY() < corridor1.getBox().getMaxY()) {
+							corridor1.getExits().add(new Coords2D(corridor1.getBox().getCenterX(), corridor2.getBox().getMinY()) );
+						}
+						else {
+							corridor1.getExits().add(new Coords2D( corridor1.getBox().getCenterX(), corridor2.getBox().getMaxY()) );
+						}
+					}
+				}
+
+			});
+		});
+		return corridors;
+	}
+
 	/**
 	 * 
 	 * @param waylines
@@ -168,9 +312,9 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param orderedRooms
 	 * @return
 	 */
-	private List<IDungeonRoom> selectAuxiliaryRooms(List<Wayline> waylines, List<IDungeonRoom> rooms,
-			List<IDungeonRoom> orderedRooms) {
-		List<IDungeonRoom> newOrderedRooms = new LinkedList<>(orderedRooms);
+	private List<IRoom> selectAuxiliaryRooms(List<Wayline> waylines, List<IRoom> rooms,
+			List<IRoom> orderedRooms) {
+		List<IRoom> newOrderedRooms = new LinkedList<>(orderedRooms);
 		rooms.forEach(room -> {
 //			LOGGER.debug("processing room -> {}, role -> {}\n", room.getId(), room.getRole());
 			if (room.getRole() != RoomRole.MAIN) {
@@ -193,8 +337,8 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param orderedRooms
 	 * @return
 	 */
-	private List<IDungeonRoom> addExits(List<Wayline> waylines, List<IDungeonRoom> orderedRooms) {
-		final List<IDungeonRoom> newOrderedRooms = new LinkedList<>(orderedRooms);
+	private List<IRoom> addExits(List<Wayline> waylines, List<IRoom> orderedRooms) {
+		final List<IRoom> newOrderedRooms = new LinkedList<>(orderedRooms);
 		newOrderedRooms.forEach(room -> {
 			addExits(room, waylines, orderedRooms);
 		});
@@ -207,7 +351,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param waylines
 	 * @param orderedRooms
 	 */
-	private void addExits(IDungeonRoom room, List<Wayline> waylines, List<IDungeonRoom> orderedRooms) {
+	private void addExits(IRoom room, List<Wayline> waylines, List<IRoom> orderedRooms) {
 		waylines.forEach(wayline -> {
 			addExits(room, wayline, orderedRooms);
 		});
@@ -219,10 +363,11 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param wayline
 	 * @param orderedRooms
 	 */
-	private void addExits(IDungeonRoom room, Wayline wayline, List<IDungeonRoom> orderedRooms) {
-		if (intersects(room, wayline, orderedRooms)) {
-			Coords2D coords1 = wayline.getConnector1();
-			Coords2D coords2 = wayline.getConnector2();
+	private void addExits(IRoom room, Wayline wayline, List<IRoom> orderedRooms) {
+		if (intersects(room, wayline)) {
+			Coords2D coords1 = wayline.getConnector1().getCoords();
+			Coords2D coords2 = wayline.getConnector2().getCoords();
+//			LOGGER.debug("exit: using coords1 -> {}, coords2 -> {}", coords1, coords2);
 			Axis axis = (coords1.getX() == coords2.getX())	? Axis.Y : Axis.X;
 			switch(axis) {
 			case X:
@@ -230,14 +375,18 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 					if ((coords1.getX() >= room.getMinX() && coords1.getX() <= room.getMaxX()) 
 							|| (coords2.getX() >= room.getMinX() && coords2.getX() <= room.getMaxX())) {
 						room.getExits().add(new Coords2D(room.getMinX(), coords1.getY()));
+//						LOGGER.debug("adding exit at -> {}", (new Coords2D(room.getMinX(), coords1.getY())));
 					}
 					else {
 						room.getExits().add(new Coords2D(room.getMinX(), coords1.getY()));
 						room.getExits().add(new Coords2D(room.getMaxX(), coords1.getY()));
+//						LOGGER.debug("adding 2 exits at -> {}", (new Coords2D(room.getMinX(), coords1.getY())));
+//						LOGGER.debug(" and at -> {}", (new Coords2D(room.getMaxX(), coords1.getY())));
 					}
 				}
 				else {
 					room.getExits().add(new Coords2D(room.getMaxX(), coords1.getY()));
+//					LOGGER.debug("adding exit at -> {}", (new Coords2D(room.getMaxX(), coords1.getY())));
 				}
 				break;
 			case Y:
@@ -266,10 +415,10 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param rooms
 	 * @return
 	 */
-	private boolean intersects(IDungeonRoom room, List<Wayline> waylines, List<? extends IDungeonRoom> rooms) {
+	private boolean intersects(IRoom room, List<Wayline> waylines, List<? extends IRoom> rooms) {
 //		LOGGER.debug("room to intersect with -> {}", room.getBox());
 		for (Wayline wayline : waylines) {
-			if (intersects(room, wayline, rooms)) {
+			if (intersects(room, wayline)) {
 				return true;
 			}
 		}
@@ -283,7 +432,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param nodes
 	 * @return
 	 */
-	private boolean intersects(IDungeonRoom room, Wayline wayline, List<? extends IDungeonRoom> nodes) {
+	private boolean intersects(IRoom room, Wayline wayline) {
 		Rectangle2D rectangle = wayline.getBox();
 		if (rectangle.intersects(room.getBox()) || room.getBox().intersects(rectangle)) {
 			return true;
@@ -318,7 +467,8 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 			
 			// horizontal wayline (east-west)
 			if (checkHorizontalConnectivity(node1, node2)) {
-				Wayline wayline = getHorizontalWayline(node1, node2);		
+				Wayline wayline = getHorizontalWayline(node1, node2);
+//				LOGGER.debug("horizontal wayline final -> {}", wayline);
 				waylines.add(wayline);
 			}
 			// vertical wayline (north-south)
@@ -330,33 +480,34 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 			else {
 				Coords2D node1Center = node1.getCenter();
 
-				Coords2D connector1 = null;
+				WayConnector connector1 = null;
 				// node2 is to the right/east/positive-x of node1
 				if (node2.getCenter().getX() > node1.getCenter().getX()) {
-					 connector1 = new Coords2D(node1.getMaxX()-1, node1Center.getY());
+					 connector1 = new WayConnector(new Coords2D(node1.getMaxX()-1, node1Center.getY()), (IRoom)node1);
 				}
 				// node2 is to the left/west/negative-x of node1
 				else {
 					// NOTE only thing that is differences from if() is that node1p uses minX as opposed to maxX and the +1/-1
-					connector1 = new Coords2D(node1.getMinX()+1, node1Center.getY());
+					connector1 = new WayConnector(new Coords2D(node1.getMinX()+1, node1Center.getY()), (IRoom)node1);
 				}
 				
 				// NOTE connector2 is the "destination" or "joint" node, so it should be shared with both segments
-				Coords2D connector2 = new Coords2D(node2.getCenter().getX(), node1Center.getY());
+				WayConnector connector2 = new WayConnector(new Coords2D(node2.getCenter().getX(), node1Center.getY()), null);
 				Wayline wayline1 = new Wayline(connector1, connector2);
 				
 				// room2 is up (postivie-y) of room 1
 				if (node2.getCenter().getY() > node1.getCenter().getY()) {
-					connector1 = new Coords2D(node2.getCenter().getX(), node2.getMinY()+1);
+					connector1 = new WayConnector(new Coords2D(node2.getCenter().getX(), node2.getMinY()+1), (IRoom)node2);
 				}
 				// room2 is down (negative-y) of room 1
 				else {
-					connector1 = new Coords2D(node2.getCenter().getX(), node2.getMaxY()-1);
+					connector1 = new WayConnector(new Coords2D(node2.getCenter().getX(), node2.getMaxY()-1), (IRoom)node2);
 				}
 				Wayline wayline2 = new Wayline(connector1, connector2);
 				if (wayline1 != null && wayline2 != null) {
 					waylines.add(wayline1);
 					waylines.add(wayline2);
+					LOGGER.debug("adding elbow wayline -> {}\n-> {}", wayline1, wayline2);
 				}
 			}
 		}
@@ -414,12 +565,15 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		int innerMinX = Math.max(node1.getMinX(),  node2.getMinX());
 		int innerMaxY = Math.min(node1.getMaxY(), node2.getMaxY());
 		int innerMinY = Math.max(node1.getMinY(), node2.getMinY());
-		
 		int waylineY = (innerMaxY + innerMinY) / 2;
+		// order and map nodes for connetors
+		INode wc1 = node1.getMinX() == innerMinX ? node1 : node2;
+		INode wc2 = node1.getMaxX() == innerMaxX ? node1 : node2;
 
-		Coords2D connector1 = new Coords2D(innerMinX+1, waylineY);
-		Coords2D connector2 = new Coords2D(innerMaxX-1, waylineY);
+		WayConnector connector1 = new WayConnector(new Coords2D(innerMinX+1, waylineY), (IRoom)wc1);
+		WayConnector connector2 = new WayConnector(new Coords2D(innerMaxX-1, waylineY), (IRoom)wc2);
 		Wayline wayline = new Wayline(connector1, connector2);
+		LOGGER.debug("adding horizontal wayline -> {}", wayline);
 		return wayline;
 	}
 
@@ -440,13 +594,17 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		int innerMaxX = Math.min(node1.getMaxX(),  node2.getMaxX());
 		int innerMinX = Math.max(node1.getMinX(),  node2.getMinX());
 		int innerMaxY = Math.min(node1.getMaxY(), node2.getMaxY());
-		int innerMinY = Math.max(node1.getMinY(), node2.getMinY());
-		
+		int innerMinY = Math.max(node1.getMinY(), node2.getMinY());		
 		int waylineX = (innerMaxX + innerMinX) / 2;
 		
-		Coords2D connector1 = new Coords2D(waylineX, innerMinY + 1);
-		Coords2D connector2 = new Coords2D(waylineX, innerMaxY - 1);
+		// order and map nodes for connetors
+		INode wc1 = node1.getMinY() == innerMinY ? node1 : node2;
+		INode wc2 = node1.getMaxY() == innerMaxY ? node1 : node2;
+		
+		WayConnector connector1 = new WayConnector(new Coords2D(waylineX, innerMinY + 1), (IRoom)wc1);
+		WayConnector connector2 = new WayConnector(new Coords2D(waylineX, innerMaxY - 1), (IRoom)wc2);
 		Wayline wayline = new Wayline(connector1, connector2);
+		LOGGER.debug("adding vertical wayline -> {}", wayline);
 		return wayline;
 	}
 	
@@ -516,8 +674,8 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param rooms
 	 * @return
 	 */
-	public Map<Integer, IDungeonRoom> mapRooms(List<IDungeonRoom> rooms) {
-		Map<Integer, IDungeonRoom> map = new HashMap<>();
+	public Map<Integer, IRoom> mapRooms(List<IRoom> rooms) {
+		Map<Integer, IRoom> map = new HashMap<>();
 		rooms.forEach(room -> {
 			map.put(Integer.valueOf(room.getId()), room);
 		});
@@ -662,10 +820,10 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param meanFactor
 	 * @return
 	 */
-	public List<IDungeonRoom> selectMainRooms(List<IDungeonRoom> rooms, final double meanFactor) {
-		List<IDungeonRoom> mainRooms = new ArrayList<>();
+	public List<IRoom> selectMainRooms(List<IRoom> rooms, final double meanFactor) {
+		List<IRoom> mainRooms = new ArrayList<>();
 		int totalArea = 0;
-		for (IDungeonRoom room : rooms) {
+		for (IRoom room : rooms) {
 			totalArea += room.getBox().getWidth() * room.getBox().getHeight();
 		}
 
@@ -682,7 +840,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	}
 
 	// TODO currently this is updating the map that is passed in, not creating a new map
-	public boolean[][] updateCellMap(boolean cellMap[][], List<IDungeonRoom> rooms) {
+	public boolean[][] updateCellMap(boolean cellMap[][], List<IRoom> rooms) {
 		rooms.forEach(room -> {
 //			System.out.println("generating room @ (" + room.getOrigin().getX() + ", " + room.getOrigin().getY() + "), width=" + room.getBox().getWidth() + ", height=" + room.getBox().getHeight());
 			for (int w = 0; w < room.getBox().getWidth(); w++) {
@@ -705,9 +863,9 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param movementFactor dictates how much to move a R at a time. lower number mean the Rs will be closer together but more iterations performed
 	 * @return
 	 */
-	public List<IDungeonRoom> separateRooms(List<IDungeonRoom> sourceRooms, int movementFactor) {
+	public List<IRoom> separateRooms(List<IRoom> sourceRooms, int movementFactor) {
 		// duplicate the soure rooms
-		List<IDungeonRoom> workingRooms = new ArrayList<>(sourceRooms);
+		List<IRoom> workingRooms = new ArrayList<>(sourceRooms);
 
 		// find the center C of the bounding box of all the rooms.
 		Coords2D center = getCenter(workingRooms);
@@ -728,7 +886,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		ArrayList<? super INode> intersections = new ArrayList<>();
 
 		for (INode intersectingRect : nodes) {
-			if (!((IDungeonRoom)node).equals(intersectingRect) && ((IDungeonRoom)intersectingRect).getBox().intersects(((IDungeonRoom)node).getBox())) {
+			if (!((IRoom)node).equals(intersectingRect) && ((IRoom)intersectingRect).getBox().intersects(((IRoom)node).getBox())) {
 				intersections.add(intersectingRect);
 			}
 		}
@@ -761,7 +919,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		return map;
 	}
 
-	private List<IDungeonRoom> initRooms(Random random) {
+	private List<IRoom> initRooms(Random random) {
 		return initRooms(random, this.width, this.height, this.minRoomSize, this.maxRoomSize);
 	}
 
@@ -772,14 +930,14 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param height
 	 * @return
 	 */
-	private List<IDungeonRoom> initRooms(Random random, final int width, final int height, final int minRoomSize, final int maxRoomSize) {
-		List<IDungeonRoom> rooms = new ArrayList<>();
+	private List<IRoom> initRooms(Random random, final int width, final int height, final int minRoomSize, final int maxRoomSize) {
+		List<IRoom> rooms = new ArrayList<>();
 		Coords2D centerPoint = new Coords2D(width/2, height / 2);
 
 		// TODO this needs to be defined somewhere
 		Rectangle2D boundingBox = new Rectangle2D(0, 0, spawnBoxWidth, spawnBoxHeight);	
 		
-		IDungeonRoom startRoom = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
+		IRoom startRoom = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
 		startRoom
 			.setRole(RoomRole.MAIN)
 			.setType(NodeType.START)
@@ -788,13 +946,13 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		
 		// TODO need to add start room and flagged
 		for (int roomIndex = 0; roomIndex < numberOfRooms; roomIndex++) {
-			IDungeonRoom room = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
+			IRoom room = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
 			room.setId(roomIndex + 1);
 			rooms.add(room);
 		}
 		
 		// have to have at least one end room
-		IDungeonRoom endRoom = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
+		IRoom endRoom = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
 		endRoom
 			.setRole(RoomRole.MAIN)	
 			.setType(NodeType.END)
@@ -813,7 +971,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param maxRoomSize2
 	 * @return
 	 */
-	private IDungeonRoom generateRoom(Random random, Coords2D centerPoint, Rectangle2D boundingBox, int minRoomSize2,
+	private IRoom generateRoom(Random random, Coords2D centerPoint, Rectangle2D boundingBox, int minRoomSize2,
 			int maxRoomSize2) {
 		
 		int sizeX = maxRoomSize == minRoomSize ? minRoomSize : random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
@@ -821,7 +979,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		int offsetX = (random.nextInt(boundingBox.getWidth()) - (boundingBox.getWidth()/2)) - (sizeX / 2);
 		int offsetY = (random.nextInt(boundingBox.getHeight()) - (boundingBox.getHeight()/2)) - (sizeY / 2);
 		
-		IDungeonRoom room = new DungeonRoom(new Coords2D(centerPoint.getX() + offsetX, centerPoint.getY() + offsetY), sizeX, sizeY);
+		IRoom room = new Room(new Coords2D(centerPoint.getX() + offsetX, centerPoint.getY() + offsetY), sizeX, sizeY);
 		return room;
 	}
 

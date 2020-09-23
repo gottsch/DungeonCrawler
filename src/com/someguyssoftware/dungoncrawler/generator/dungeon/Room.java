@@ -16,26 +16,25 @@ import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
  *
  */
 // TODO extends AbstractGraphNode
-public class DungeonRoom implements IDungeonRoom {
+public class Room implements IRoom {
 	private int id;
 	private Rectangle2D box;
 	private int maxDegrees;
 	private NodeType nodeType;
 	private RoomRole roomRole;
-//	private boolean isMain;
 	private List<Coords2D> exits;
 	
 	/**
 	 * Empty constructor
 	 */
-	public DungeonRoom() {
+	public Room() {
 		// ensure all required fields (ex box) are generated lazily in getters if allowing empty constructors
 	}
 	
 	/*
 	 * 
 	 */
-	public DungeonRoom(int x, int y, int width, int depth) {
+	public Room(int x, int y, int width, int depth) {
 		this(new Coords2D(x, y), width, depth);
 	}
 	
@@ -45,7 +44,7 @@ public class DungeonRoom implements IDungeonRoom {
 	 * @param width
 	 * @param depth
 	 */
-	public DungeonRoom(Coords2D origin, int width, int depth) {
+	public Room(Coords2D origin, int width, int depth) {
 		this.box = new Rectangle2D(origin, width, depth);
 		this.maxDegrees = 3;
 		this.nodeType = NodeType.STANDARD;
@@ -134,7 +133,7 @@ public class DungeonRoom implements IDungeonRoom {
 	}
 
 	@Override
-	public IDungeonRoom setRole(RoomRole roomRole) {
+	public IRoom setRole(RoomRole roomRole) {
 		this.roomRole = roomRole;
 		return this;
 	}

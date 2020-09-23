@@ -20,12 +20,12 @@ public class DungeonLevel implements ILevel {
 	/*
 	 * a list of all the rooms
 	 */
-	private List<IDungeonRoom> rooms;
+	private List<IRoom> rooms;
 
 	/*
 	 * map of all the rooms by id
 	 */
-	private Map<Integer, IDungeonRoom> roomMap;
+	private Map<Integer, IRoom> roomMap;
 	
 	// TODO don't really like this part of DungeonLevel as it is a graphing object
 	/*
@@ -37,6 +37,8 @@ public class DungeonLevel implements ILevel {
 	
 	private List<Wayline> waylines;
 	
+	private List<Corridor> corridors;
+	
 	public boolean[][] getCellMap() {
 		return cellMap;
 	}
@@ -45,14 +47,14 @@ public class DungeonLevel implements ILevel {
 		this.cellMap = cellMap;
 	}
 
-	public List<IDungeonRoom> getRooms() {
+	public List<IRoom> getRooms() {
 		if (rooms == null) {
 			rooms = new ArrayList<>();
 		}
 		return rooms;
 	}
 
-	public void setRooms(List<IDungeonRoom> rooms) {
+	public void setRooms(List<IRoom> rooms) {
 		this.rooms = rooms;
 	}
 
@@ -84,11 +86,11 @@ public class DungeonLevel implements ILevel {
 		this.edges = edges;
 	}
 
-	public Map<Integer, IDungeonRoom> getRoomMap() {
+	public Map<Integer, IRoom> getRoomMap() {
 		return roomMap;
 	}
 
-	public void setRoomMap(Map<Integer, IDungeonRoom> roomMap) {
+	public void setRoomMap(Map<Integer, IRoom> roomMap) {
 		this.roomMap = roomMap;
 	}
 
@@ -106,6 +108,14 @@ public class DungeonLevel implements ILevel {
 
 	public void setWaylines(List<Wayline> waylines) {
 		this.waylines = waylines;
+	}
+
+	public List<Corridor> getCorridors() {
+		return corridors;
+	}
+
+	public void setCorridors(List<Corridor> corridors) {
+		this.corridors = corridors;
 	}
 	
 }

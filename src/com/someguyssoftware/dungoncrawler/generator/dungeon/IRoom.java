@@ -13,7 +13,7 @@ import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
  * @author Mark Gottschling on Sep 15, 2020
  *
  */
-public interface IDungeonRoom extends INode {
+public interface IRoom extends INode {
 	public Rectangle2D getBox();
 	public void setBox(Rectangle2D box);
 	
@@ -21,7 +21,7 @@ public interface IDungeonRoom extends INode {
 //	public IDungeonRoom setMain(boolean isMain);
 	
 	RoomRole getRole();
-	IDungeonRoom setRole(RoomRole roomRole);
+	IRoom setRole(RoomRole roomRole);
 	
 	List<Coords2D> getExits();
 	void setExits(List<Coords2D> exits);
