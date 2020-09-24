@@ -14,7 +14,7 @@ public interface INode {
 	public void setOrigin(Coords2D origin);
 	
 	public int getMaxDegrees();
-	public void setMaxDegrees(int degrees);
+	public INode setMaxDegrees(int degrees);
 	
     public NodeType getType();
     public INode setType(NodeType type);

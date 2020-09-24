@@ -58,6 +58,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	private int movementFactor = 1;
 	private double meanFactor = 1.15;
 	private double pathFactor = 0.25;
+	private boolean hardBoundary = true;
 	
 	@Override
 	public ILevel init() {
@@ -88,7 +89,10 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		List<IRoom> rooms = dungeonData.getRooms();
 		
 		// separate rooms
-		rooms = (List<IRoom>)(List<?>)separateNodes(rooms, movementFactor);
+		rooms = separateRooms(rooms, movementFactor);
+		
+		// remove rooms outside boundary
+		rooms = checkConstraints(rooms);
 		
 		// select main rooms
 		List<IRoom> mainRooms = selectMainRooms(rooms, meanFactor);
@@ -102,7 +106,10 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		List<IRoom> orderedRooms = new LinkedList<>();
 		for(IRoom room : mainRooms) {
 			orderedRooms.add(room);
+			// TEST
+			int id = room.getId();
 			room.setId(orderedRooms.size()-1);
+			LOGGER.debug("room id -> {} changed to -> {}", id, room.getId());
 			if (room.getType() == NodeType.START) {
 				start = room;
 			}
@@ -163,6 +170,165 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		return dungeonData;
 	}
 	
+	/**
+	 * 
+	 * @param rooms
+	 * @param movementFactor dictates how much to move a R at a time. lower number mean the Rs will be closer together but more iterations performed
+	 * @return
+	 */
+//	@SuppressWarnings("unchecked")
+//	public List<IRoom> separateNodes(List<IRoom> rooms, int movementFactor) {
+//		// duplicate the soure rooms
+//		List<IRoom> resultantNodes = new ArrayList<>(rooms);
+//
+//		// find the center C of the bounding box of all the nodes.
+//		Coords2D center = getCenter(resultantNodes);
+//
+//		boolean hasIntersections = true;
+//		while (hasIntersections) {			
+//			hasIntersections = iterateSeparationStep(center, resultantNodes, movementFactor);
+//		}
+//		
+//		return resultantNodes;
+//	}
+	
+	/**
+	 * 
+	 * @param room
+	 * @return
+	 */
+	public Coords2D getCenter(List<IRoom> room) {
+		Rectangle2D boundingBox = getBoundingBox(room);
+		Coords2D center = boundingBox.getCenter();
+		return center;
+	}
+	
+	/**
+	 * 
+	 * @param rooms
+	 * @return
+	 */
+	private Rectangle2D getBoundingBox(List<IRoom> rooms) {
+		Coords2D topLeft = null;
+		Coords2D bottomRight = null;
+
+		for (IRoom room : rooms) {
+			if (topLeft == null) {
+				topLeft = new Coords2D(room.getOrigin().getX(), room.getOrigin().getY());
+			} else {
+				if (room.getOrigin().getX() < topLeft.getX()) {
+					topLeft.setLocation(room.getOrigin().getX(), topLeft.getY());
+				}
+
+				if (room.getOrigin().getY() < topLeft.getY()) {
+					topLeft.setLocation(topLeft.getX(), room.getOrigin().getY());
+				}
+			}
+
+			if (bottomRight == null) {
+				bottomRight = new Coords2D(room.getMaxX() , (int) room.getMaxY());
+			} else {
+				if (room.getMaxX() > bottomRight.getX()) {
+					bottomRight.setLocation((int) room.getMaxX(), bottomRight.getY());
+				}
+
+				if (room.getMaxY() > bottomRight.getY()) {
+					bottomRight.setLocation(bottomRight.getX(), (int) room.getMaxY());
+				}
+			}
+		}
+		return new Rectangle2D(topLeft.getX(), topLeft.getY(), bottomRight.getX() - topLeft.getX(),
+				bottomRight.getY() - topLeft.getY());
+	}
+	
+	/**
+	 * 
+	 * @param rooms
+	 * @return
+	 */
+	public boolean iterateSeparationStep(Coords2D center, List<IRoom> rooms, int movementFactor) {
+		boolean hasIntersections = false;
+		
+		// TEST
+		int x = 0;
+		int y = 0;
+		// TODO add checks for anchor rooms ex. start and end
+		
+		for (IRoom room : rooms) {
+			// TODO what if multiple anchor rooms overlap?
+			// TODO anchor rooms can cause other rooms to get stuck in an overlap position -> infinite loop -> need a escape
+			if (room.getFlags().contains(RoomFlag.ANCHOR)) {
+				continue;
+			}
+			
+			// find all the rectangles R' that overlap R.
+			List<IRoom> intersectingRooms = findIntersections(room, rooms);
+			
+			if (intersectingRooms.size() > 0) {
+
+				// Define a movement vector v.
+				Coords2D movementVector = new Coords2D(0, 0);
+				
+				Coords2D centerR = new Coords2D(room.getCenter());
+				
+				// for each rectangle R that overlaps another.
+				for (IRoom rPrime : intersectingRooms) {
+					Coords2D centerRPrime = new Coords2D(rPrime.getCenter());
+
+					int translatedX = centerR.getX() - centerRPrime.getX();
+					int translatedY = centerR.getY() - centerRPrime.getY();
+
+					// TODO this statement is not exactly true. it is not "proportional", but increments by 1 (or the movementFactor)
+					// add a vector to v proportional to the vector between the center of R and R'.
+					movementVector.translate(translatedX < 0 ? -movementFactor : movementFactor,
+							translatedY < 0 ? -movementFactor : movementFactor);
+				}
+				
+				int translatedX = centerR.getX() - center.getX();
+				int translatedY = centerR.getY() - center.getY();
+
+				// add a vector to v proportional to the vector between C and the center of R.
+				movementVector.translate(translatedX < 0 ? -movementFactor : movementFactor,
+						translatedY < 0 ? -movementFactor : movementFactor);
+LOGGER.debug("movement x -> {}, y -> {}", movementVector.getX(), movementVector.getY());
+x += movementVector.getX();
+y += movementVector.getY(); 
+				// translate R by v.
+				room.setOrigin(new Coords2D(room.getOrigin().getX() + movementVector.getX(), room.getOrigin().getY() + movementVector.getY()));
+
+				// repeat until nothing overlaps.
+				hasIntersections = true;
+			}
+
+
+		}
+		LOGGER.debug("total movement x -> {}, y -> {}", x, y);
+		x = 0;
+		y = 0;
+		return hasIntersections;
+	}
+	
+	/**
+	 * 
+	 * @param rooms
+	 * @return
+	 */
+	private List<IRoom> checkConstraints(List<IRoom> rooms) {
+		List<IRoom> validRooms = new ArrayList<IRoom>();
+		Rectangle2D boundary = new Rectangle2D(0, 0, getWidth(), getHeight());	
+
+		rooms.forEach(room -> {
+			if(boundaryConstraint(boundary, room)) {
+				validRooms.add(room);
+			}
+			else {
+				LOGGER.debug("room at {} [w:{}, h:{}] failed boundaries test", room.getBox().getOrigin(), room.getBox().getWidth(), room.getBox().getHeight());
+			}
+		});
+
+		return validRooms;
+	}
+
 	/**
 	 * 
 	 * @param waylines
@@ -507,7 +673,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 				if (wayline1 != null && wayline2 != null) {
 					waylines.add(wayline1);
 					waylines.add(wayline2);
-					LOGGER.debug("adding elbow wayline -> {}\n-> {}", wayline1, wayline2);
+//					LOGGER.debug("adding elbow wayline -> {}\n-> {}", wayline1, wayline2);
 				}
 			}
 		}
@@ -573,7 +739,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		WayConnector connector1 = new WayConnector(new Coords2D(innerMinX+1, waylineY), (IRoom)wc1);
 		WayConnector connector2 = new WayConnector(new Coords2D(innerMaxX-1, waylineY), (IRoom)wc2);
 		Wayline wayline = new Wayline(connector1, connector2);
-		LOGGER.debug("adding horizontal wayline -> {}", wayline);
+//		LOGGER.debug("adding horizontal wayline -> {}", wayline);
 		return wayline;
 	}
 
@@ -604,82 +770,8 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		WayConnector connector1 = new WayConnector(new Coords2D(waylineX, innerMinY + 1), (IRoom)wc1);
 		WayConnector connector2 = new WayConnector(new Coords2D(waylineX, innerMaxY - 1), (IRoom)wc2);
 		Wayline wayline = new Wayline(connector1, connector2);
-		LOGGER.debug("adding vertical wayline -> {}", wayline);
+//		LOGGER.debug("adding vertical wayline -> {}", wayline);
 		return wayline;
-	}
-	
-	/**
-	 * 
-	 * @param edges
-	 * @param mainRooms
-	 * @return
-	 */
-	public List<Edge> getPaths(Random random, List<Edge> edges, List<? extends INode> nodes) {
-		/*
-		 * paths are the reduced edges generated by the Minimun Spanning Tree
-		 */
-		List<Edge> paths = new ArrayList<>();
-		
-		/**
-		 * counts the number of edges that are assigned to each node/vertex
-		 */
-		int[] edgeCount = new int[nodes.size()];
-		
-		/*
-		 * Map to keep track of which edges for source list have already been used (in MST and extra edges)
-		 */
-		Map<String, Edge> usedEdges = new HashMap<>();
-		
-		// reduce all edges to MST
-		EdgeWeightedGraph graph = new EdgeWeightedGraph(nodes.size(), edges);
-		LazyPrimMST mst = new LazyPrimMST(graph);
-		for (Edge edge : mst.edges()) {
-//			if (nodeMap.containsKey(Integer.valueOf(e.v)) && nodeMap.containsKey(Integer.valueOf(e.w))) {
-			if (edge.v < nodes.size() && edge.w < nodes.size()) {
-				INode node1 = nodes.get(edge.v);
-				INode node2 = nodes.get(edge.w);	
-				paths.add(edge);
-				edgeCount[node1.getId()]++;
-				edgeCount[node2.getId()]++;
-			}
-			else {
-				//LOGGER.warn(String.format("Ignored Room: array out-of-bounds: v: %d, w: %d", edge.v, edge.w));
-			}
-		}		
-		
-		// add more edges
-		int addtionalEdges = (int) (edges.size() * this.pathFactor); // TODO get the % from config
-		for (int i = 0 ; i < addtionalEdges; i++) {
-			int pos = random.nextInt(edges.size());
-			Edge edge = edges.get(pos);
-			
-			// TODO ensure that only non-used edges are selected (and doesn't increment the counter)
-			// this would require a list of edges used, BUT first need to match up the edges from mst.edges and
-			// param edges - their array indexes wouldn't align.
-			INode node1 = nodes.get(edge.v);
-			INode node2 = nodes.get(edge.w);
-			if (node1.getType() != NodeType.END && node2.getType() != NodeType.END &&
-					edgeCount[node1.getId()] < node1.getMaxDegrees() && edgeCount[node2.getId()] < node2.getMaxDegrees()) {
-				paths.add(edge);
-				edgeCount[node1.getId()]++;
-				edgeCount[node2.getId()]++;				
-			}
-
-		}
-		return paths;
-	}
-
-	/**
-	 * 
-	 * @param rooms
-	 * @return
-	 */
-	public Map<Integer, IRoom> mapRooms(List<IRoom> rooms) {
-		Map<Integer, IRoom> map = new HashMap<>();
-		rooms.forEach(room -> {
-			map.put(Integer.valueOf(room.getId()), room);
-		});
-		return map;
 	}
 
 	private List<Edge> triangulate(List<? extends INode> nodes) {
@@ -707,7 +799,10 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		 */
 		List<Edge> edges = new ArrayList<>();
 		
-
+		/**
+		 * counts the number of edges that are assigned to each node/vertex
+		 */
+		int[] edgeCount = new int[nodes.size()];
 
 		/**
 		 * a flag to indicate that an edge leading to the "end" room is created
@@ -812,6 +907,71 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		}
 		return edges;
 	}
+	
+	/**
+	 * 
+	 * @param edges
+	 * @param mainRooms
+	 * @return
+	 */
+	public List<Edge> getPaths(Random random, List<Edge> edges, List<? extends INode> nodes) {
+		/*
+		 * paths are the reduced edges generated by the Minimun Spanning Tree
+		 */
+		List<Edge> paths = new ArrayList<>();
+		
+		/**
+		 * counts the number of edges that are assigned to each node/vertex
+		 */
+		int[] edgeCount = new int[nodes.size()];
+		
+		/*
+		 * Map to keep track of which edges for source list have already been used (in MST and extra edges)
+		 */
+		Map<String, Edge> usedEdges = new HashMap<>();
+		
+		// reduce all edges to MST
+		EdgeWeightedGraph graph = new EdgeWeightedGraph(nodes.size(), edges);
+		LazyPrimMST mst = new LazyPrimMST(graph);
+		for (Edge edge : mst.edges()) {
+//			if (nodeMap.containsKey(Integer.valueOf(e.v)) && nodeMap.containsKey(Integer.valueOf(e.w))) {
+			if (edge.v < nodes.size() && edge.w < nodes.size()) {
+				INode node1 = nodes.get(edge.v);
+				INode node2 = nodes.get(edge.w);	
+				// only add edge if max edges has not been met
+				if (edgeCount[node1.getId()] < node1.getMaxDegrees() && edgeCount[node2.getId()] < node2.getMaxDegrees()) {
+					paths.add(edge);
+					edgeCount[node1.getId()]++;
+					edgeCount[node2.getId()]++;
+				}
+			}
+			else {
+				//LOGGER.warn(String.format("Ignored Room: array out-of-bounds: v: %d, w: %d", edge.v, edge.w));
+			}
+		}		
+		
+		// add more edges
+		int addtionalEdges = (int) (edges.size() * this.pathFactor); // TODO get the % from config
+		for (int i = 0 ; i < addtionalEdges; i++) {
+			int pos = random.nextInt(edges.size());
+			Edge edge = edges.get(pos);
+			
+			// TODO ensure that only non-used edges are selected (and doesn't increment the counter)
+			// this would require a list of edges used, BUT first need to match up the edges from mst.edges and
+			// param edges - their array indexes wouldn't align.
+			INode node1 = nodes.get(edge.v);
+			INode node2 = nodes.get(edge.w);
+			if (node1.getType() != NodeType.END && node2.getType() != NodeType.END &&
+					edgeCount[node1.getId()] < node1.getMaxDegrees() && edgeCount[node2.getId()] < node2.getMaxDegrees()) {
+				paths.add(edge);
+				edgeCount[node1.getId()]++;
+				edgeCount[node2.getId()]++;				
+			}
+
+		}
+		return paths;
+	}
+	
 
 	/**
 	 * Returns a subset of rooms that meet the mean factor criteria. Start and End rooms are included as main rooms.
@@ -830,7 +990,8 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		int meanArea = (int) totalArea / rooms.size();
 
 		rooms.forEach(room -> {
-			if (room.getType() == NodeType.START || room.getType() == NodeType.END || room.getBox().getWidth() * room.getBox().getHeight() > meanArea) {
+			if (room.getRole() == RoomRole.MAIN || room.getType() == NodeType.START || room.getType() == NodeType.END
+					|| room.getBox().getWidth() * room.getBox().getHeight() > meanArea) {
 				room.setRole(RoomRole.MAIN);
 				mainRooms.add(room);
 			}
@@ -881,12 +1042,11 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	/**
 	 * 
 	 */
-	@Override
-	public List<? super INode> findIntersections(INode node, List<? extends INode> nodes) {
-		ArrayList<? super INode> intersections = new ArrayList<>();
+	public List<IRoom> findIntersections(IRoom room, List<IRoom> rooms) {
+		ArrayList<IRoom> intersections = new ArrayList<>();
 
-		for (INode intersectingRect : nodes) {
-			if (!((IRoom)node).equals(intersectingRect) && ((IRoom)intersectingRect).getBox().intersects(((IRoom)node).getBox())) {
+		for (IRoom intersectingRect : rooms) {
+			if (!room.equals(intersectingRect) && intersectingRect.getBox().intersects(room.getBox())) {
 				intersections.add(intersectingRect);
 			}
 		}
@@ -919,6 +1079,11 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		return map;
 	}
 
+	/**
+	 * 
+	 * @param random
+	 * @return
+	 */
 	private List<IRoom> initRooms(Random random) {
 		return initRooms(random, this.width, this.height, this.minRoomSize, this.maxRoomSize);
 	}
@@ -934,32 +1099,105 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		List<IRoom> rooms = new ArrayList<>();
 		Coords2D centerPoint = new Coords2D(width/2, height / 2);
 
-		// TODO this needs to be defined somewhere
-		Rectangle2D boundingBox = new Rectangle2D(0, 0, spawnBoxWidth, spawnBoxHeight);	
+		// TODO needs to be centered on level
+		Rectangle2D levelBoundingBox = new Rectangle2D((centerPoint.getX() - spawnBoxWidth/2) - 8, (centerPoint.getY() - spawnBoxWidth/2) -8, spawnBoxWidth + 16, spawnBoxHeight +16);	
+		Rectangle2D spawnBoundingBox = new Rectangle2D(0, 0, spawnBoxWidth, spawnBoxHeight);	
 		
-		IRoom startRoom = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
+		IRoom startRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
 		startRoom
 			.setRole(RoomRole.MAIN)
 			.setType(NodeType.START)
+			.setMaxDegrees(5)
 			.setId(0);		
 		rooms.add(startRoom);
 		
+		// TEST[i like it] seed the level with small rooms that will be removed (but will bring down the mean size)
+		for (int roomIndex = 0; roomIndex < 5; roomIndex++) { // TODO make the number of seed rooms variable
+			IRoom room = generateRoom(random, centerPoint, spawnBoundingBox, 5, 5); // TODO 5 -> make variable
+			// constrainsts check
+			if (!boundaryConstraint(levelBoundingBox, room)) {
+				LOGGER.debug("room at {} [w:{}, h:{}] failed boundaries test", room.getBox().getOrigin(), room.getBox().getWidth(), room.getBox().getHeight());
+				continue;
+			}
+			// set the id
+			room.setId(rooms.size());
+			room.setMaxDegrees(5); // TODO get from generator
+			// add to list
+			rooms.add(room);
+			LOGGER.debug("seed room id -> {}, size -> {}", room.getId(), room.getBox());
+		}
+		
 		// TODO need to add start room and flagged
 		for (int roomIndex = 0; roomIndex < numberOfRooms; roomIndex++) {
-			IRoom room = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
-			room.setId(roomIndex + 1);
+			IRoom room = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
+			// constrainsts check
+			if (!boundaryConstraint(levelBoundingBox, room)) {
+				LOGGER.debug("room at {} [w:{}, h:{}] failed boundaries test", room.getBox().getOrigin(), room.getBox().getWidth(), room.getBox().getHeight());
+				continue;
+			}
+			// set the id
+			room.setId(rooms.size());
+			room.setMaxDegrees(5); // TODO get from generator
+			// add to list
 			rooms.add(room);
+			LOGGER.debug("room.id -> {}", room.getId());
 		}
 		
 		// have to have at least one end room
-		IRoom endRoom = generateRoom(random, centerPoint, boundingBox, minRoomSize, maxRoomSize);
+		IRoom endRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
 		endRoom
 			.setRole(RoomRole.MAIN)	
 			.setType(NodeType.END)
+			.setMaxDegrees(1)
 			.setId(rooms.size()); // TODO check if still works without +1
 		rooms.add(endRoom);
+		LOGGER.debug("end room id -> {}, size of list -> {}", endRoom.getId(), rooms.size());
 		
+		
+//		// testing: add a secret room
+//		IRoom secretRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
+//		secretRoom
+//			.setRole(RoomRole.MAIN)	
+//			.setType(NodeType.STANDARD)
+//			.setMaxDegrees(1)
+//			.setId(rooms.size());
+//		rooms.add(secretRoom);
+//		LOGGER.debug("secret room id -> {}, size of list -> {}", secretRoom.getId(), rooms.size());
+		
+		// TEST add anchor room
+		IRoom anchorRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
+//		anchorRoom.setBox(new Rectangle2D((int)centerPoint.getX() - (anchorRoom.getBox().getWidth()/2), (int)centerPoint.getY() - (anchorRoom.getBox().getHeight()/2), 5, 5));
+			anchorRoom.setRole(RoomRole.MAIN)	
+			.setMaxDegrees(5)
+			.setId(rooms.size()); // TODO check if still works without +1
+		anchorRoom.getFlags().add(RoomFlag.ANCHOR);
+		rooms.add(anchorRoom);
+		
+		anchorRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
+//		anchorRoom.setBox(new Rectangle2D((int)centerPoint.getX() - (anchorRoom.getBox().getWidth()/2), (int)centerPoint.getY() - (anchorRoom.getBox().getHeight()/2), 5, 5));
+			anchorRoom.setRole(RoomRole.MAIN)	
+			.setMaxDegrees(5)
+			.setId(rooms.size()); // TODO check if still works without +1
+		anchorRoom.getFlags().add(RoomFlag.ANCHOR);
+		rooms.add(anchorRoom);
+		LOGGER.debug("anchor room id -> {}, size of list -> {}", anchorRoom.getId(), rooms.size());
 		return rooms;
+	}
+
+	/**
+	 * 
+	 * @param boundary
+	 * @param room
+	 * @return
+	 */
+	private boolean boundaryConstraint(Rectangle2D boundary, IRoom room) {
+		if (room.getMinX() >= boundary.getMaxX() || room.getMaxX() > boundary.getMaxX()
+				|| room.getMaxX() <= boundary.getMinX() || room.getMinX() < boundary.getMinX()
+				|| room.getMinY() >= boundary.getMaxY() || room.getMaxY() > boundary.getMaxY()
+				|| room.getMaxY() <= boundary.getMinY() || room.getMinY() < boundary.getMinY()) {
+			return false;
+		}
+		return true;
 	}
 
 	/**
@@ -971,14 +1209,13 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param maxRoomSize2
 	 * @return
 	 */
-	private IRoom generateRoom(Random random, Coords2D centerPoint, Rectangle2D boundingBox, int minRoomSize2,
-			int maxRoomSize2) {
+	private IRoom generateRoom(Random random, Coords2D centerPoint, Rectangle2D boundingBox, int minRoomSize,
+			int maxRoomSize) {
 		
 		int sizeX = maxRoomSize == minRoomSize ? minRoomSize : random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
 		int sizeY = maxRoomSize == minRoomSize ? minRoomSize : random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
 		int offsetX = (random.nextInt(boundingBox.getWidth()) - (boundingBox.getWidth()/2)) - (sizeX / 2);
-		int offsetY = (random.nextInt(boundingBox.getHeight()) - (boundingBox.getHeight()/2)) - (sizeY / 2);
-		
+		int offsetY = (random.nextInt(boundingBox.getHeight()) - (boundingBox.getHeight()/2)) - (sizeY / 2);		
 		IRoom room = new Room(new Coords2D(centerPoint.getX() + offsetX, centerPoint.getY() + offsetY), sizeX, sizeY);
 		return room;
 	}
@@ -1140,5 +1377,27 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	public DungeonLevelGenerator withPathFactor(double factor) {
 		this.pathFactor = factor;
 		return this;
+	}
+
+	public boolean isHardBoundary() {
+		return hardBoundary;
+	}
+
+	public void setHardBoundary(boolean hardBoundary) {
+		this.hardBoundary = hardBoundary;
+	}
+	
+	/// TEMP
+	/**
+	 * 
+	 * @param rooms
+	 * @return
+	 */
+	public Map<Integer, IRoom> mapRooms(List<IRoom> rooms) {
+		Map<Integer, IRoom> map = new HashMap<>();
+		rooms.forEach(room -> {
+			map.put(Integer.valueOf(room.getId()), room);
+		});
+		return map;
 	}
 }

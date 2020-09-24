@@ -17,13 +17,13 @@ public interface IRoom extends INode {
 	public Rectangle2D getBox();
 	public void setBox(Rectangle2D box);
 	
-//	public boolean isMain();
-//	public IDungeonRoom setMain(boolean isMain);
-	
 	RoomRole getRole();
 	IRoom setRole(RoomRole roomRole);
 	
 	List<Coords2D> getExits();
 	void setExits(List<Coords2D> exits);
+	
+	List<RoomFlag> getFlags();
+	void setFlags(List<RoomFlag> flags);
 	
 }

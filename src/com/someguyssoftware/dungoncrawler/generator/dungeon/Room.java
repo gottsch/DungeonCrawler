@@ -22,6 +22,7 @@ public class Room implements IRoom {
 	private int maxDegrees;
 	private NodeType nodeType;
 	private RoomRole roomRole;
+	private List<RoomFlag> flags;
 	private List<Coords2D> exits;
 	
 	/**
@@ -123,8 +124,9 @@ public class Room implements IRoom {
 	}
 
 	@Override
-	public void setMaxDegrees(int degrees) {
+	public INode setMaxDegrees(int degrees) {
 		this.maxDegrees = degrees;
+		return this;
 	}
 
 	@Override
@@ -154,6 +156,19 @@ public class Room implements IRoom {
 	@Override
 	public void setExits(List<Coords2D> exits) {
 		this.exits = exits;
+	}
+
+	@Override
+	public List<RoomFlag> getFlags() {
+		if (flags == null) {
+			flags = new ArrayList<>();
+		}
+		return flags;
+	}
+
+	@Override
+	public void setFlags(List<RoomFlag> flags) {
+		this.flags = flags;
 	}
 
 }

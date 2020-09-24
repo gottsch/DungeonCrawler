@@ -20,6 +20,7 @@ import com.someguyssoftware.dungoncrawler.generator.dungeon.Corridor;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.DungeonLevel;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.DungeonLevelGenerator;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.IRoom;
+import com.someguyssoftware.dungoncrawler.generator.dungeon.RoomFlag;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.RoomRole;
 
 import javafx.application.Application;
@@ -73,6 +74,7 @@ public class DungeonVisualizer extends Application {
 	private int tileWidth = 5;
 	private int tileHeight = 5;
 
+	private boolean showGrid = true;
 	private boolean showCenterPoint = false;
 	private boolean showSpawnBoundary = false;
 	private boolean showNonRooms = true;
@@ -132,7 +134,9 @@ public class DungeonVisualizer extends Application {
 		group.getChildren().add(bg);
 
 		// add grid legends
-		addGrid(group);
+		if(showGrid) {
+			addGrid(group);
+		}
 		
 		// add spawn boundary
 		if (showSpawnBoundary) {
@@ -170,7 +174,12 @@ public class DungeonVisualizer extends Application {
 
 						// setup the common drawing attributes
 						tile.setStrokeWidth(0.5);
-						tile.setFill(ROOM_FLOOR_COLOR);
+						if (room.getFlags().contains(RoomFlag.ANCHOR)) {
+							tile.setFill(Color.BLACK);
+						}
+						else {
+							tile.setFill(ROOM_FLOOR_COLOR);
+						}
 						if (x == 0 || y == 0 || x == room.getBox().getWidth()-1 || y == room.getBox().getHeight()-1) {
 							//							tile.setFill(color);
 							tile.setStroke(Color.LIGHTGREY);
@@ -346,6 +355,11 @@ public class DungeonVisualizer extends Application {
 		});	
 	}
 	
+	/**
+	 * 
+	 * @param corridor
+	 * @param group
+	 */
 	private void addCorridorOutline(Corridor corridor, Group group) {
 		Rectangle outline = new Rectangle(startX + (corridor.getBox().getOrigin().getX() * tileWidth), startY + (corridor.getBox().getOrigin().getY() * tileHeight),
 				corridor.getBox().getWidth() * tileWidth, corridor.getBox().getHeight() * tileHeight);
@@ -353,67 +367,12 @@ public class DungeonVisualizer extends Application {
 		outline.setStroke(Color.BEIGE);
 		group.getChildren().add(outline);
 	}
-	
+
 	/**
 	 * 
 	 * @param level2
 	 * @param group
 	 */
-	private void addCorridorsOfWayline(DungeonLevel level, Group group) {
-		level.getWaylines().forEach(wayline -> {
-			if (wayline.getConnector1() != null && wayline.getConnector2() != null) {
-				Coords2D connector1 = wayline.getConnector1().getCoords();
-				Coords2D connector2 = wayline.getConnector2().getCoords();
-				// draw vertically
-				if (connector1.getX() == connector2.getX()) {
-					//	LOGGER.debug("drawing wayline from -> {} to {}", room1.getId(), room2.getId());
-					// order rooms for drawing
-					Coords2D s = null;
-					Coords2D e = null;
-					if (connector1.getY() < connector2.getY()) {
-						s = connector1;
-						e = connector2;
-					}
-					else {
-						s = connector2;
-						e = connector1;
-					}
-					for (int y = s.getY(); y <= e.getY(); y++) {
-						//						LOGGER.debug("draw at -> ({}, {})",s.getOrigin().getX(), y);
-						Rectangle tile = new Rectangle(startX + (s.getX() * tileWidth), (y * tileHeight), tileWidth, tileHeight);
-						tile.setStroke(Color.YELLOW);
-						tile.setFill(Color.BLACK);
-						group.getChildren().add(tile);
-					}
-				}
-				// horizontally
-				else {
-					// order connectors for drawing
-					Coords2D s = null;
-					Coords2D e = null;
-					if (connector1.getX() < connector2.getX()) {
-						s = connector1;
-						e = connector2;
-					}
-					else {
-						s = connector2;
-						e = connector1;
-					}
-					for (int x = s.getX(); x <= e.getX(); x++) {
-						//						LOGGER.debug("draw at -> ({}, {})\n", x, s.getOrigin().getY());
-						Rectangle tile = new Rectangle(startX + (x * tileWidth) , (s.getY() * tileHeight), tileWidth, tileHeight);
-						tile.setStroke(Color.YELLOW);
-						tile.setFill(Color.BLACK);
-						group.getChildren().add(tile);
-					}
-				}
-			}
-			else {
-				//				LOGGER.info("Skipping wayline edge v/w with index of :" + wayline.v + ", " + wayline.w);
-			}
-		});
-	}
-
 	private void addEdges(DungeonLevel level2, Group group) {
 		level.getEdges().forEach(edge -> {
 			if (edge.v < level.getRooms().size() && edge.w < level.getRooms().size()) {
@@ -621,6 +580,11 @@ public class DungeonVisualizer extends Application {
 		fields.add(pathFactorField);
 		hBoxes.add(pathFactorBox);
 
+		// show grid
+		HBox showGridBox = addToggle("Show Grid:", showGrid, labels, hBoxes, (visualizer, bool) -> {
+			visualizer.setShowGrid(bool);
+		});
+		
 		// show center point
 		HBox showCenterPointBox = addToggle("Show Center Point:", showCenterPoint, labels, hBoxes, (visualizer, bool) -> {
 			visualizer.setShowCenterPoint(bool);
@@ -741,8 +705,12 @@ public class DungeonVisualizer extends Application {
 			box.setSpacing(5);
 		}
 
-		pane.getChildren().addAll(widthBox, heightBox, spawnBoundaryWidthBox, spawnBoundaryHeightBox, numRoomsBox, 				minRoomSizeBox, maxRoomSizeBox, movementFactorBox, meanFactorBox, pathFactorBox, 
-				showCenterPointBox, showSpawnBoundaryBox, showNonRoomsBox, showEdgesBox, showPathsBox, showWaylinesBox, 
+		pane.getChildren().addAll(
+				widthBox, heightBox, 
+				spawnBoundaryWidthBox, spawnBoundaryHeightBox, 
+				numRoomsBox, minRoomSizeBox, maxRoomSizeBox, 
+				movementFactorBox, meanFactorBox, pathFactorBox, 
+				showGridBox, showCenterPointBox, showSpawnBoundaryBox, showNonRoomsBox, showEdgesBox, showPathsBox, showWaylinesBox, 
 				buttonsBox, buttonsBox2);
 	}
 
@@ -841,5 +809,13 @@ public class DungeonVisualizer extends Application {
 
 	public void setShowSpawnBoundary(boolean showSpawnBoundary) {
 		this.showSpawnBoundary = showSpawnBoundary;
+	}
+
+	public boolean isShowGrid() {
+		return showGrid;
+	}
+
+	public void setShowGrid(boolean showGrid) {
+		this.showGrid = showGrid;
 	}
 }
