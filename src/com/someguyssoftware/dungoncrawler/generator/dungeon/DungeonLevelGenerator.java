@@ -5,12 +5,11 @@ package com.someguyssoftware.dungoncrawler.generator.dungeon;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
-import java.util.Vector;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -24,30 +23,27 @@ import com.someguyssoftware.dungoncrawler.generator.INode;
 import com.someguyssoftware.dungoncrawler.generator.NodeType;
 import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
 import com.someguyssoftware.dungoncrawler.graph.mst.Edge;
-import com.someguyssoftware.dungoncrawler.graph.mst.EdgeWeightedGraph;
-import com.someguyssoftware.dungoncrawler.graph.mst.LazyPrimMST;
-
-import io.github.jdiemke.triangulation.DelaunayTriangulator;
-import io.github.jdiemke.triangulation.NotEnoughPointsException;
-import io.github.jdiemke.triangulation.Triangle2D;
-import io.github.jdiemke.triangulation.Vector2D;
 
 /**
- * This is a 2D level generator. Therfore dimensions are described as x-aix [length] and y-axis [width] and the observer is on the z-axis [height], looking down.
- *  So when something is assigned a dimension value that adds volumn to a plane, it will be on the z-axis.
- *  This is different from a 3D view where the Y is the height and Z is the width (or depth).
- * Overlapping rectangle code based on https://stackoverflow.com/questions/3265986/an-algorithm-to-space-out-overlapping-rectangles
+ * This is a 2D level generator. Therfore dimensions are described as x-aix
+ * [length] and y-axis [width] and the observer is on the z-axis [height],
+ * looking down. So when something is assigned a dimension value that adds
+ * volumn to a plane, it will be on the z-axis. This is different from a 3D view
+ * where the Y is the height and Z is the width (or depth). Overlapping
+ * rectangle code based on
+ * https://stackoverflow.com/questions/3265986/an-algorithm-to-space-out-overlapping-rectangles
+ * 
  * @author Mark Gottschling on Sep 15, 2020
  *
  */
 public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
-	
+
 	protected static final Logger LOGGER = LogManager.getLogger(DungeonLevelGenerator.class);
-	
+
 	private static final ILevel EMPTY_LEVEL = new DungeonLevel();
 
 	private static final int MIN_ROOM_OVERLAP = 3;
-	
+
 	private int width = 96;
 	private int height = 96;
 	private int spawnBoxWidth = 30;
@@ -59,7 +55,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	private double meanFactor = 1.15;
 	private double pathFactor = 0.25;
 	private boolean hardBoundary = true;
-	
+
 	@Override
 	public ILevel init() {
 		DungeonLevel dungeonData = new DungeonLevel();
@@ -69,7 +65,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		List<IRoom> rooms = initRooms(random);
 		Map<Integer, IRoom> roomMap = mapRooms(rooms);
 		cellMap = updateCellMap(cellMap, rooms);
-		
+
 		dungeonData.setCellMap(cellMap);
 		dungeonData.setRooms(rooms);
 		dungeonData.setRoomMap(roomMap);
@@ -79,7 +75,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		dungeonData.setCorridors(new ArrayList<Corridor>());
 		return dungeonData;
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public ILevel build() {
@@ -87,75 +83,77 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		Random random = new Random();
 		boolean[][] cellMap = dungeonData.getCellMap();
 		List<IRoom> rooms = dungeonData.getRooms();
-		
+
 		// separate rooms
 		rooms = separateRooms(rooms, movementFactor);
-		
+
 		// remove rooms outside boundary
 		rooms = checkConstraints(rooms);
-		
+
 		// select main rooms
 		List<IRoom> mainRooms = selectMainRooms(rooms, meanFactor);
-		
+
 		/*
-		 * because of how DelaunayTriangulator works, the main rooms need to in a ordered list
-		 * AND their ids need to be reset according to their position in the list
+		 * reset ids add main rooms to an ordered list. (because of how
+		 * DelaunayTriangulator works, the main rooms need to in a ordered list AND
+		 * their ids need to be reset according to their position in the list)
 		 */
 		IRoom start = null;
 		IRoom end = null; // TODO can be a list (multiple end rooms, one is primary the others are decoys)
 		List<IRoom> orderedRooms = new LinkedList<>();
-		for(IRoom room : mainRooms) {
+		for (IRoom room : mainRooms) {
 			orderedRooms.add(room);
 			// TEST
 			int id = room.getId();
-			room.setId(orderedRooms.size()-1);
+			room.setId(orderedRooms.size() - 1);
 			LOGGER.debug("room id -> {} changed to -> {}", id, room.getId());
 			if (room.getType() == NodeType.START) {
 				start = room;
-			}
-			else if (room.getType() == NodeType.END) {
+			} else if (room.getType() == NodeType.END) {
 				end = room;
 			}
 		}
-				
+
 		// map the rooms
 //		Map<Integer, IDungeonRoom> roomMap = mapRooms(orderedMainRooms);
-		
-		// TODO move to abstract
-		/*
-		 * DelaunayTriangulator library requires that the list of nodes be in an ordered list
-		 * (the actual sort order doesn't matter, as long as it keeps its order).
-		 */
+
 		// triangulate valid rooms
-		List<Edge> edges = triangulate(orderedRooms);
-		if (edges == null) {
+		Optional<List<Edge>> edges = triangulate(orderedRooms);
+		if (!edges.isPresent()) {
 			return EMPTY_LEVEL;
 		}
-		
-		// TODO move to abstract
+
 		// get the paths using minimum spanning tree
-		List<Edge> paths = getPaths(random, edges, orderedRooms);
-		
-		// TODO move to abstract
+		List<Edge> paths = getPaths(random, edges.get(), orderedRooms, getPathFactor());
+
 		// test if start room can reach the end room
 		if (!breadthFirstSearch(start.getId(), end.getId(), orderedRooms, paths)) {
 			LOGGER.debug("A path doesn't exist from start room to end room on level.");
 			return EMPTY_LEVEL;
 		}
-			
+
 		// add waylines
 		List<Wayline> waylines = getWaylines(random, paths, orderedRooms);
-		
-		List<Corridor> corridors = getCorridors(waylines);
-		
+
 		// add exits to main rooms
 		orderedRooms = addExits(waylines, orderedRooms);
 
-		// reintroduce minor rooms into ordered list. these are not auxiliary rooms until it is determine that they intersect with a corridor
+		// reintroduce minor rooms into ordered list. these are not auxiliary rooms
+		// until it is determine that they intersect with a corridor
 		orderedRooms = selectAuxiliaryRooms(waylines, rooms, orderedRooms);
+
+		// add corridors based on waylines
+		List<Corridor> corridors = getCorridors(waylines);
+		
+		// TODO should this be part of getCorridors(), which then must take in the list of rooms
+		// update corridors with room intersections
+		for(Corridor corridor : corridors) {
+			corridor.findIntersections(orderedRooms);
+		}
 		
 		// TODO add elevation variance
 		
+
 		// TODO will take the corridor edges as well
 		cellMap = updateCellMap(cellMap, orderedRooms);
 
@@ -163,35 +161,13 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		dungeonData.setCellMap(cellMap);
 		dungeonData.setRooms(orderedRooms);
 //		dungeonData.setRoomMap(roomMap);
-		dungeonData.setEdges(edges);
+		dungeonData.setEdges(edges.get());
 		dungeonData.setPaths(paths);
 		dungeonData.getWaylines().addAll(waylines);
 		dungeonData.getCorridors().addAll(corridors);
 		return dungeonData;
 	}
-	
-	/**
-	 * 
-	 * @param rooms
-	 * @param movementFactor dictates how much to move a R at a time. lower number mean the Rs will be closer together but more iterations performed
-	 * @return
-	 */
-//	@SuppressWarnings("unchecked")
-//	public List<IRoom> separateNodes(List<IRoom> rooms, int movementFactor) {
-//		// duplicate the soure rooms
-//		List<IRoom> resultantNodes = new ArrayList<>(rooms);
-//
-//		// find the center C of the bounding box of all the nodes.
-//		Coords2D center = getCenter(resultantNodes);
-//
-//		boolean hasIntersections = true;
-//		while (hasIntersections) {			
-//			hasIntersections = iterateSeparationStep(center, resultantNodes, movementFactor);
-//		}
-//		
-//		return resultantNodes;
-//	}
-	
+
 	/**
 	 * 
 	 * @param room
@@ -202,7 +178,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		Coords2D center = boundingBox.getCenter();
 		return center;
 	}
-	
+
 	/**
 	 * 
 	 * @param rooms
@@ -226,7 +202,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 			}
 
 			if (bottomRight == null) {
-				bottomRight = new Coords2D(room.getMaxX() , (int) room.getMaxY());
+				bottomRight = new Coords2D(room.getMaxX(), (int) room.getMaxY());
 			} else {
 				if (room.getMaxX() > bottomRight.getX()) {
 					bottomRight.setLocation((int) room.getMaxX(), bottomRight.getY());
@@ -240,7 +216,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		return new Rectangle2D(topLeft.getX(), topLeft.getY(), bottomRight.getX() - topLeft.getX(),
 				bottomRight.getY() - topLeft.getY());
 	}
-	
+
 	/**
 	 * 
 	 * @param rooms
@@ -248,29 +224,28 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 */
 	public boolean iterateSeparationStep(Coords2D center, List<IRoom> rooms, int movementFactor) {
 		boolean hasIntersections = false;
-		
-		// TEST
-		int x = 0;
-		int y = 0;
+		int totalMovement = 0;
+
 		// TODO add checks for anchor rooms ex. start and end
-		
+
 		for (IRoom room : rooms) {
 			// TODO what if multiple anchor rooms overlap?
-			// TODO anchor rooms can cause other rooms to get stuck in an overlap position -> infinite loop -> need a escape
+			// TODO anchor rooms can cause other rooms to get stuck in an overlap position
+			// -> infinite loop -> need a escape
 			if (room.getFlags().contains(RoomFlag.ANCHOR)) {
 				continue;
 			}
-			
+
 			// find all the rectangles R' that overlap R.
 			List<IRoom> intersectingRooms = findIntersections(room, rooms);
-			
+
 			if (intersectingRooms.size() > 0) {
 
 				// Define a movement vector v.
 				Coords2D movementVector = new Coords2D(0, 0);
-				
+
 				Coords2D centerR = new Coords2D(room.getCenter());
-				
+
 				// for each rectangle R that overlaps another.
 				for (IRoom rPrime : intersectingRooms) {
 					Coords2D centerRPrime = new Coords2D(rPrime.getCenter());
@@ -278,36 +253,70 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 					int translatedX = centerR.getX() - centerRPrime.getX();
 					int translatedY = centerR.getY() - centerRPrime.getY();
 
-					// TODO this statement is not exactly true. it is not "proportional", but increments by 1 (or the movementFactor)
+					// TODO this statement is not exactly true. it is not "proportional", but
+					// increments by 1 (or the movementFactor)
 					// add a vector to v proportional to the vector between the center of R and R'.
 					movementVector.translate(translatedX < 0 ? -movementFactor : movementFactor,
 							translatedY < 0 ? -movementFactor : movementFactor);
 				}
-				
+
 				int translatedX = centerR.getX() - center.getX();
 				int translatedY = centerR.getY() - center.getY();
 
 				// add a vector to v proportional to the vector between C and the center of R.
 				movementVector.translate(translatedX < 0 ? -movementFactor : movementFactor,
 						translatedY < 0 ? -movementFactor : movementFactor);
-LOGGER.debug("movement x -> {}, y -> {}", movementVector.getX(), movementVector.getY());
-x += movementVector.getX();
-y += movementVector.getY(); 
+
 				// translate R by v.
-				room.setOrigin(new Coords2D(room.getOrigin().getX() + movementVector.getX(), room.getOrigin().getY() + movementVector.getY()));
+				room.setOrigin(new Coords2D(room.getOrigin().getX() + movementVector.getX(),
+						room.getOrigin().getY() + movementVector.getY()));
 
 				// repeat until nothing overlaps.
 				hasIntersections = true;
+				// add movement to the total
+				totalMovement += (movementVector.getX() + movementVector.getY());
 			}
 
-
 		}
-		LOGGER.debug("total movement x -> {}, y -> {}", x, y);
-		x = 0;
-		y = 0;
+
+		// now do a check
+		if (hasIntersections && totalMovement == 0) {
+			List<IRoom> roomsToRemove = new ArrayList<>();
+			// loop through all the rooms
+			rooms.forEach(room -> {
+				// don't process if room is already in the roomsToRemove
+				if (roomsToRemove.contains(room)) {
+					return;
+				}
+				List<IRoom> intersectingRooms = findIntersections(room, rooms);
+				if (intersectingRooms.size() > 0) {
+					intersectingRooms.forEach(intersectRoom -> {
+						/*
+						 * Remove the intersecting room if: 1) it is NOT a START or END room 2) a) the
+						 * main IS a START or END room b) OR the intersecting room is NOT an ANCHOR c)
+						 * OR both main room and intersecting rooms are ANCHOR
+						 */
+						if ((intersectRoom.getType() != NodeType.START && intersectRoom.getType() != NodeType.END)) {
+							LOGGER.debug("intersect room {} is not START nor END", intersectRoom.getId());
+							if ((room.getType() == NodeType.START || room.getType() == NodeType.END)
+									|| !intersectRoom.getFlags().contains(RoomFlag.ANCHOR)
+									|| (room.getFlags().contains(RoomFlag.ANCHOR)
+											&& intersectRoom.getFlags().contains(RoomFlag.ANCHOR))) {
+								roomsToRemove.add(intersectRoom);
+								LOGGER.debug("adding room.id -> {} to remove", intersectRoom.getId());
+							}
+						}
+
+					});
+				}
+			});
+			// NOTE modifies rooms list here
+			rooms.removeAll(roomsToRemove);
+		}
+
 		return hasIntersections;
 	}
-	
+
 	/**
 	 * 
 	 * @param rooms
@@ -315,14 +324,14 @@ y += movementVector.getY();
 	 */
 	private List<IRoom> checkConstraints(List<IRoom> rooms) {
 		List<IRoom> validRooms = new ArrayList<IRoom>();
-		Rectangle2D boundary = new Rectangle2D(0, 0, getWidth(), getHeight());	
+		Rectangle2D boundary = new Rectangle2D(0, 0, getWidth(), getHeight());
 
 		rooms.forEach(room -> {
-			if(boundaryConstraint(boundary, room)) {
+			if (boundaryConstraint(boundary, room)) {
 				validRooms.add(room);
-			}
-			else {
-				LOGGER.debug("room at {} [w:{}, h:{}] failed boundaries test", room.getBox().getOrigin(), room.getBox().getWidth(), room.getBox().getHeight());
+			} else {
+				LOGGER.debug("room at {} [w:{}, h:{}] failed boundaries test", room.getBox().getOrigin(),
+						room.getBox().getWidth(), room.getBox().getHeight());
 			}
 		});
 
@@ -337,26 +346,28 @@ y += movementVector.getY();
 	public List<Corridor> getCorridors(List<Wayline> waylines) {
 		List<Corridor> corridors = new ArrayList<>();
 		waylines.forEach(wayline -> {
-			Axis axis = (wayline.getConnector1().getCoords().getX() == wayline.getConnector2().getCoords().getX())	? Axis.Y : Axis.X;
-			
+			Axis axis = (wayline.getConnector1().getCoords().getX() == wayline.getConnector2().getCoords().getX())
+					? Axis.Y
+					: Axis.X;
+
 			// setup
 			WayConnector connector1 = null;
 			WayConnector connector2 = null;
 			Coords2D coords1 = null;
 			Coords2D coords2 = null;
 			List<Coords2D> exits = new ArrayList<>();
-			
-			// TODO FUTURE determine the max width of a corridor (by odd numbers: 3, 5, 7) (probably not bigger than 5 else it isn't a corridor anymore)
+
+			// TODO FUTURE determine the max width of a corridor (by odd numbers: 3, 5, 7)
+			// (probably not bigger than 5 else it isn't a corridor anymore)
 			int width = 3;
-			
-			switch(axis) {
+
+			switch (axis) {
 			case X:
 				// order the connectors
 				if (wayline.getConnector1().getCoords().getX() <= wayline.getConnector2().getCoords().getX()) {
 					connector1 = wayline.getConnector1();
 					connector2 = wayline.getConnector2();
-				}
-				else {
+				} else {
 					connector1 = wayline.getConnector2();
 					connector2 = wayline.getConnector1();
 				}
@@ -364,82 +375,85 @@ y += movementVector.getY();
 				// new coords so as to not override current waylines connector coords
 				coords1 = new Coords2D(connector1.getCoords());
 				coords2 = new Coords2D(connector2.getCoords());
-								
-				// adjust the position/widths. ie. the corridor is adjusted to not overlap connecting into rooms, but instead if joint so the corridor is properly drawn
+
+				// adjust the position/widths. ie. the corridor is adjusted to not overlap
+				// connecting into rooms, but instead if joint so the corridor is properly drawn
 				if (connector1.getRoom() != null) {
 					// edge of corridor equals edge of room
 					coords1.setX(connector1.getRoom().getMaxX());
 					/*
-					 * add exit to corridor
-					 * add before altering the width of the corridor so it aligns with the room
+					 * add exit to corridor add before altering the width of the corridor so it
+					 * aligns with the room
 					 */
 					exits.add(new Coords2D(coords1.getX(), coords1.getY()));
-				}
-				else {
-					// grow length by at least 1 
+				} else {
+					// grow length by at least 1
 					coords1.setX(coords1.getX() - 1);
 				}
-				
+
 				if (connector2.getRoom() != null) {
 					// edge of corridor equals edge of room
 					coords2.setX(connector2.getRoom().getMinX());
 					/*
-					 * add exit to corridor
-					 * add before altering the width of the corridor so it aligns with the room
+					 * add exit to corridor add before altering the width of the corridor so it
+					 * aligns with the room
 					 */
 					exits.add(new Coords2D(coords2.getX(), coords2.getY()));
-				}
-				else {
-					// grow length by at least 1 
+				} else {
+					// grow length by at least 1
 					coords2.setX(coords2.getX() + 1);
-				}				
-				
+				}
+
 				// grow width by 2 to make at least 3 wide (TODO able to have wider corridors)
 				coords1.setY(coords1.getY() - 1);
 				coords2.setY(coords2.getY() + 1);
 				break;
-				
+
 			case Y:
 				if (wayline.getConnector1().getCoords().getY() <= wayline.getConnector2().getCoords().getY()) {
 					connector1 = wayline.getConnector1();
 					connector2 = wayline.getConnector2();
-				}
-				else {
+				} else {
 					connector1 = wayline.getConnector2();
 					connector2 = wayline.getConnector1();
 				}
-				
+
 				// new coords so as to not override current waylines connector coords
 				coords1 = new Coords2D(connector1.getCoords());
 				coords2 = new Coords2D(connector2.getCoords());
-				
+
 				if (connector1.getRoom() != null) {
 					coords1.setY(connector1.getRoom().getMaxY());
 					exits.add(new Coords2D(coords1.getX(), coords1.getY()));
-				}
-				else {
+				} else {
 					coords1.setY(coords1.getY() - 1);
 				}
-				
+
 				if (connector2.getRoom() != null) {
 					coords2.setY(connector2.getRoom().getMinY());
 					exits.add(new Coords2D(coords2.getX(), coords2.getY()));
-				}
-				else {
+				} else {
 					coords2.setY(coords2.getY() + 1);
 				}
 				coords1.setX(coords1.getX() - 1);
 				coords2.setX(coords2.getX() + 1);
 			}
-			
+
 			// create corridor
 			Corridor corridor = new Corridor(new Rectangle2D(coords1, coords2));
 			corridor.setAxis(axis);
 			corridor.setExits(exits);
+			if (connector1.getRoom() != null) {
+				corridor.getConnectsTo().add(connector1.getRoom());
+			}
+			if (connector2.getRoom() != null) {
+				corridor.getConnectsTo().add(connector2.getRoom());
+			}
+
 			// add corridor to list
 			corridors.add(corridor);
 		});
-		
+
 		// addExits between corridors
 		corridors.forEach(corridor1 -> {
 			corridors.forEach(corridor2 -> {
@@ -449,19 +463,22 @@ y += movementVector.getY();
 				if (corridor1.getBox().intersects(corridor2.getBox())) {
 					// typical/expected scenario - opposite axis; same axis we will want to ignore
 					if (corridor1.getAxis() == Axis.X && corridor2.getAxis() == Axis.Y) {
-						if (corridor2.getBox().getMinX() > corridor1.getBox().getMinX() && corridor2.getBox().getMinX() < corridor1.getBox().getMaxX()) {
-							corridor1.getExits().add(new Coords2D(corridor2.getBox().getMinX(), corridor1.getBox().getCenterY()));
+						if (corridor2.getBox().getMinX() > corridor1.getBox().getMinX()
+								&& corridor2.getBox().getMinX() < corridor1.getBox().getMaxX()) {
+							corridor1.getExits()
+									.add(new Coords2D(corridor2.getBox().getMinX(), corridor1.getBox().getCenterY()));
+						} else {
+							corridor1.getExits()
+									.add(new Coords2D(corridor2.getBox().getMaxX(), corridor1.getBox().getCenterY()));
 						}
-						else {
-							corridor1.getExits().add(new Coords2D(corridor2.getBox().getMaxX(), corridor1.getBox().getCenterY()));
-						}
-					}
-					else if (corridor1.getAxis() == Axis.Y && corridor2.getAxis() == Axis.X) {
-						if (corridor2.getBox().getMinY() > corridor1.getBox().getMinY() && corridor2.getBox().getMinY() < corridor1.getBox().getMaxY()) {
-							corridor1.getExits().add(new Coords2D(corridor1.getBox().getCenterX(), corridor2.getBox().getMinY()) );
-						}
-						else {
-							corridor1.getExits().add(new Coords2D( corridor1.getBox().getCenterX(), corridor2.getBox().getMaxY()) );
+					} else if (corridor1.getAxis() == Axis.Y && corridor2.getAxis() == Axis.X) {
+						if (corridor2.getBox().getMinY() > corridor1.getBox().getMinY()
+								&& corridor2.getBox().getMinY() < corridor1.getBox().getMaxY()) {
+							corridor1.getExits()
+									.add(new Coords2D(corridor1.getBox().getCenterX(), corridor2.getBox().getMinY()));
+						} else {
+							corridor1.getExits()
+									.add(new Coords2D(corridor1.getBox().getCenterX(), corridor2.getBox().getMaxY()));
 						}
 					}
 				}
@@ -478,8 +495,7 @@ y += movementVector.getY();
 	 * @param orderedRooms
 	 * @return
 	 */
-	private List<IRoom> selectAuxiliaryRooms(List<Wayline> waylines, List<IRoom> rooms,
-			List<IRoom> orderedRooms) {
+	private List<IRoom> selectAuxiliaryRooms(List<Wayline> waylines, List<IRoom> rooms, List<IRoom> orderedRooms) {
 		List<IRoom> newOrderedRooms = new LinkedList<>(orderedRooms);
 		rooms.forEach(room -> {
 //			LOGGER.debug("processing room -> {}, role -> {}\n", room.getId(), room.getRole());
@@ -496,7 +512,7 @@ y += movementVector.getY();
 		});
 		return newOrderedRooms;
 	}
-	
+
 	/**
 	 * 
 	 * @param waylines
@@ -510,7 +526,7 @@ y += movementVector.getY();
 		});
 		return newOrderedRooms;
 	}
-	
+
 	/**
 	 * 
 	 * @param room
@@ -522,7 +538,7 @@ y += movementVector.getY();
 			addExits(room, wayline, orderedRooms);
 		});
 	}
-	
+
 	/**
 	 * 
 	 * @param room
@@ -534,46 +550,42 @@ y += movementVector.getY();
 			Coords2D coords1 = wayline.getConnector1().getCoords();
 			Coords2D coords2 = wayline.getConnector2().getCoords();
 //			LOGGER.debug("exit: using coords1 -> {}, coords2 -> {}", coords1, coords2);
-			Axis axis = (coords1.getX() == coords2.getX())	? Axis.Y : Axis.X;
-			switch(axis) {
+			Axis axis = (coords1.getX() == coords2.getX()) ? Axis.Y : Axis.X;
+			switch (axis) {
 			case X:
 				if (coords1.getX() < room.getMinX() || coords2.getX() < room.getMinX()) {
-					if ((coords1.getX() >= room.getMinX() && coords1.getX() <= room.getMaxX()) 
+					if ((coords1.getX() >= room.getMinX() && coords1.getX() <= room.getMaxX())
 							|| (coords2.getX() >= room.getMinX() && coords2.getX() <= room.getMaxX())) {
 						room.getExits().add(new Coords2D(room.getMinX(), coords1.getY()));
 //						LOGGER.debug("adding exit at -> {}", (new Coords2D(room.getMinX(), coords1.getY())));
-					}
-					else {
+					} else {
 						room.getExits().add(new Coords2D(room.getMinX(), coords1.getY()));
 						room.getExits().add(new Coords2D(room.getMaxX(), coords1.getY()));
 //						LOGGER.debug("adding 2 exits at -> {}", (new Coords2D(room.getMinX(), coords1.getY())));
 //						LOGGER.debug(" and at -> {}", (new Coords2D(room.getMaxX(), coords1.getY())));
 					}
-				}
-				else {
+				} else {
 					room.getExits().add(new Coords2D(room.getMaxX(), coords1.getY()));
 //					LOGGER.debug("adding exit at -> {}", (new Coords2D(room.getMaxX(), coords1.getY())));
 				}
 				break;
 			case Y:
 				if (coords1.getY() < room.getMinY() || coords2.getY() < room.getMinY()) {
-					if ((coords1.getY() >= room.getMinY() && coords1.getY() <= room.getMaxY()) 
+					if ((coords1.getY() >= room.getMinY() && coords1.getY() <= room.getMaxY())
 							|| (coords2.getY() >= room.getMinY() && coords2.getY() <= room.getMaxY())) {
 						room.getExits().add(new Coords2D(coords1.getX(), room.getMinY()));
+					} else {
+						room.getExits().add(new Coords2D(coords1.getX(), room.getMinY()));
+						room.getExits().add(new Coords2D(coords1.getX(), room.getMaxY()));
 					}
-					else {
-						room.getExits().add(new Coords2D(coords1.getX(),room.getMinY()));
-						room.getExits().add(new Coords2D(coords1.getX(),room.getMaxY()));
-					}
+				} else {
+					room.getExits().add(new Coords2D(coords1.getX(), room.getMaxY()));
 				}
-				else {
-					room.getExits().add(new Coords2D(coords1.getX(),room.getMaxY()));
-				}
-				break;	
+				break;
 			}
 		}
 	}
-	
+
 	/**
 	 * 
 	 * @param room
@@ -605,9 +617,11 @@ y += movementVector.getY();
 		}
 		return false;
 	}
-	
+
 	/**
-	 * Waylines is a dungeon method, not a graph method, so use IDungeonRoom instead of INodes
+	 * Waylines is a dungeon method, not a graph method, so use IDungeonRoom instead
+	 * of INodes
+	 * 
 	 * @param rand
 	 * @param paths
 	 * @param nodes
@@ -615,22 +629,23 @@ y += movementVector.getY();
 	 * @return
 	 */
 	protected List<Wayline> getWaylines(Random rand, List<Edge> paths, List<? extends INode> nodes) {
-		
+
 		/*
 		 * a list of a the waylines constructed from paths
 		 */
-	
+
 		List<Wayline> waylines = new ArrayList<>();
-		
+
 		for (Edge path : paths) {
 			// get the nodes
 			INode node1 = nodes.get(path.v);
 			INode node2 = nodes.get(path.w);
-			
+
 			/*
-			 * NOTE if the rooms overlap each other on a single axis, they are "close" enough that a single wayline (not-elbow) can be used to connect them.
+			 * NOTE if the rooms overlap each other on a single axis, they are "close"
+			 * enough that a single wayline (not-elbow) can be used to connect them.
 			 */
-			
+
 			// horizontal wayline (east-west)
 			if (checkHorizontalConnectivity(node1, node2)) {
 				Wayline wayline = getHorizontalWayline(node1, node2);
@@ -639,7 +654,7 @@ y += movementVector.getY();
 			}
 			// vertical wayline (north-south)
 			else if (checkVerticalConnectivity(node1, node2)) {
-				Wayline wayline = getVerticalWayline(node1, node2);		
+				Wayline wayline = getVerticalWayline(node1, node2);
 				waylines.add(wayline);
 			}
 			// elbow wayline
@@ -649,72 +664,83 @@ y += movementVector.getY();
 				WayConnector connector1 = null;
 				// node2 is to the right/east/positive-x of node1
 				if (node2.getCenter().getX() > node1.getCenter().getX()) {
-					 connector1 = new WayConnector(new Coords2D(node1.getMaxX()-1, node1Center.getY()), (IRoom)node1);
+					connector1 = new WayConnector(new Coords2D(node1.getMaxX() - 1, node1Center.getY()), (IRoom) node1);
 				}
 				// node2 is to the left/west/negative-x of node1
 				else {
-					// NOTE only thing that is differences from if() is that node1p uses minX as opposed to maxX and the +1/-1
-					connector1 = new WayConnector(new Coords2D(node1.getMinX()+1, node1Center.getY()), (IRoom)node1);
+					// NOTE only thing that is differences from if() is that node1p uses minX as
+					// opposed to maxX and the +1/-1
+					connector1 = new WayConnector(new Coords2D(node1.getMinX() + 1, node1Center.getY()), (IRoom) node1);
 				}
-				
-				// NOTE connector2 is the "destination" or "joint" node, so it should be shared with both segments
-				WayConnector connector2 = new WayConnector(new Coords2D(node2.getCenter().getX(), node1Center.getY()), null);
+
+				// NOTE connector2 is the "destination" or "joint" node, so it should be shared
+				// with both segments
+				WayConnector connector2 = new WayConnector(new Coords2D(node2.getCenter().getX(), node1Center.getY()),
+						null);
 				Wayline wayline1 = new Wayline(connector1, connector2);
-				
+
 				// room2 is up (postivie-y) of room 1
 				if (node2.getCenter().getY() > node1.getCenter().getY()) {
-					connector1 = new WayConnector(new Coords2D(node2.getCenter().getX(), node2.getMinY()+1), (IRoom)node2);
+					connector1 = new WayConnector(new Coords2D(node2.getCenter().getX(), node2.getMinY() + 1),
+							(IRoom) node2);
 				}
 				// room2 is down (negative-y) of room 1
 				else {
-					connector1 = new WayConnector(new Coords2D(node2.getCenter().getX(), node2.getMaxY()-1), (IRoom)node2);
+					connector1 = new WayConnector(new Coords2D(node2.getCenter().getX(), node2.getMaxY() - 1),
+							(IRoom) node2);
 				}
 				Wayline wayline2 = new Wayline(connector1, connector2);
 				if (wayline1 != null && wayline2 != null) {
 					waylines.add(wayline1);
 					waylines.add(wayline2);
+					// relate the waylines to each other
+					wayline1.setRelatedSegment(wayline2);
+					wayline2.setRelatedSegment(wayline1);
 //					LOGGER.debug("adding elbow wayline -> {}\n-> {}", wayline1, wayline2);
 				}
 			}
 		}
 		return waylines;
 	}
-	
+
 	/**
 	 * Dungeon Method
+	 * 
 	 * @param node1
 	 * @param node2
 	 * @return
 	 */
 	private boolean checkHorizontalConnectivity(INode node1, INode node2) {
-		if ((node1.getMaxY() <= node2.getMaxY() && node1.getMaxY() > (node2.getMinY() + MIN_ROOM_OVERLAP)) ||
-				(node2.getMaxY() <= node1.getMaxY() && node2.getMaxY() > (node1.getMinY() + MIN_ROOM_OVERLAP)) ||
-				(node1.getMinY() >= node2.getMinY() && node1.getMinY() < (node2.getMaxY() - MIN_ROOM_OVERLAP)) ||
-				(node2.getMinY() >= node1.getMinY() && node2.getMinY() < (node1.getMaxY() - MIN_ROOM_OVERLAP))) {
+		if ((node1.getMaxY() <= node2.getMaxY() && node1.getMaxY() > (node2.getMinY() + MIN_ROOM_OVERLAP))
+				|| (node2.getMaxY() <= node1.getMaxY() && node2.getMaxY() > (node1.getMinY() + MIN_ROOM_OVERLAP))
+				|| (node1.getMinY() >= node2.getMinY() && node1.getMinY() < (node2.getMaxY() - MIN_ROOM_OVERLAP))
+				|| (node2.getMinY() >= node1.getMinY() && node2.getMinY() < (node1.getMaxY() - MIN_ROOM_OVERLAP))) {
 			return true;
 		}
 		return false;
 	}
-	
+
 	/**
 	 * Dungeon Method
+	 * 
 	 * @param node1
 	 * @param node2
 	 * @return
 	 */
 	private boolean checkVerticalConnectivity(INode node1, INode node2) {
 		// vertical wayline (north-south)
-		if ((node1.getMaxX() <= node2.getMaxX() && node1.getMaxX() > (node2.getMinX() + MIN_ROOM_OVERLAP)) ||
-				(node2.getMaxX() <= node1.getMaxX() && node2.getMaxX() > (node1.getMinX() + MIN_ROOM_OVERLAP)) ||
-				(node1.getMinX() > node2.getMinX() && node1.getMinX() <= (node2.getMaxX() - MIN_ROOM_OVERLAP)) ||
-				(node2.getMinX() > node1.getMinX() && node2.getMinX() <= (node1.getMaxX() - MIN_ROOM_OVERLAP))) {
+		if ((node1.getMaxX() <= node2.getMaxX() && node1.getMaxX() > (node2.getMinX() + MIN_ROOM_OVERLAP))
+				|| (node2.getMaxX() <= node1.getMaxX() && node2.getMaxX() > (node1.getMinX() + MIN_ROOM_OVERLAP))
+				|| (node1.getMinX() > node2.getMinX() && node1.getMinX() <= (node2.getMaxX() - MIN_ROOM_OVERLAP))
+				|| (node2.getMinX() > node1.getMinX() && node2.getMinX() <= (node1.getMaxX() - MIN_ROOM_OVERLAP))) {
 			return true;
 		}
 		return false;
 	}
-	
+
 	/**
 	 * Dungeon method
+	 * 
 	 * @param node1
 	 * @param node2
 	 * @param nodes
@@ -723,12 +749,11 @@ y += movementVector.getY();
 	 */
 	public Wayline getHorizontalWayline(final INode node1, final INode node2) {
 		/*
-		 * get the min of the max's of x-axis from the 2 nodes
-		 * AND
-		 * get the max of the min's of x-axis from the 2 nodes
+		 * get the min of the max's of x-axis from the 2 nodes AND get the max of the
+		 * min's of x-axis from the 2 nodes
 		 */
-		int innerMaxX = Math.min(node1.getMaxX(),  node2.getMaxX());
-		int innerMinX = Math.max(node1.getMinX(),  node2.getMinX());
+		int innerMaxX = Math.min(node1.getMaxX(), node2.getMaxX());
+		int innerMinX = Math.max(node1.getMinX(), node2.getMinX());
 		int innerMaxY = Math.min(node1.getMaxY(), node2.getMaxY());
 		int innerMinY = Math.max(node1.getMinY(), node2.getMinY());
 		int waylineY = (innerMaxY + innerMinY) / 2;
@@ -736,8 +761,8 @@ y += movementVector.getY();
 		INode wc1 = node1.getMinX() == innerMinX ? node1 : node2;
 		INode wc2 = node1.getMaxX() == innerMaxX ? node1 : node2;
 
-		WayConnector connector1 = new WayConnector(new Coords2D(innerMinX+1, waylineY), (IRoom)wc1);
-		WayConnector connector2 = new WayConnector(new Coords2D(innerMaxX-1, waylineY), (IRoom)wc2);
+		WayConnector connector1 = new WayConnector(new Coords2D(innerMinX + 1, waylineY), (IRoom) wc1);
+		WayConnector connector2 = new WayConnector(new Coords2D(innerMaxX - 1, waylineY), (IRoom) wc2);
 		Wayline wayline = new Wayline(connector1, connector2);
 //		LOGGER.debug("adding horizontal wayline -> {}", wayline);
 		return wayline;
@@ -745,6 +770,7 @@ y += movementVector.getY();
 
 	/**
 	 * Dungeon method
+	 * 
 	 * @param node1
 	 * @param node2
 	 * @param nodes
@@ -753,229 +779,31 @@ y += movementVector.getY();
 	 */
 	public Wayline getVerticalWayline(final INode node1, final INode node2) {
 		/*
-		 * get the min of the max's of x-axis from the 2 nodes
-		 * AND
-		 * get the max of the min's of x-axis from the 2 nodes
+		 * get the min of the max's of x-axis from the 2 nodes AND get the max of the
+		 * min's of x-axis from the 2 nodes
 		 */
-		int innerMaxX = Math.min(node1.getMaxX(),  node2.getMaxX());
-		int innerMinX = Math.max(node1.getMinX(),  node2.getMinX());
+		int innerMaxX = Math.min(node1.getMaxX(), node2.getMaxX());
+		int innerMinX = Math.max(node1.getMinX(), node2.getMinX());
 		int innerMaxY = Math.min(node1.getMaxY(), node2.getMaxY());
-		int innerMinY = Math.max(node1.getMinY(), node2.getMinY());		
+		int innerMinY = Math.max(node1.getMinY(), node2.getMinY());
 		int waylineX = (innerMaxX + innerMinX) / 2;
-		
+
 		// order and map nodes for connetors
 		INode wc1 = node1.getMinY() == innerMinY ? node1 : node2;
 		INode wc2 = node1.getMaxY() == innerMaxY ? node1 : node2;
-		
-		WayConnector connector1 = new WayConnector(new Coords2D(waylineX, innerMinY + 1), (IRoom)wc1);
-		WayConnector connector2 = new WayConnector(new Coords2D(waylineX, innerMaxY - 1), (IRoom)wc2);
+
+		WayConnector connector1 = new WayConnector(new Coords2D(waylineX, innerMinY + 1), (IRoom) wc1);
+		WayConnector connector2 = new WayConnector(new Coords2D(waylineX, innerMaxY - 1), (IRoom) wc2);
 		Wayline wayline = new Wayline(connector1, connector2);
 //		LOGGER.debug("adding vertical wayline -> {}", wayline);
 		return wayline;
 	}
 
-	private List<Edge> triangulate(List<? extends INode> nodes) {
-		/*
-		 *  weight/cost array of all rooms
-		 *  the indexes is a "map" to the nodes by their position in the list
-		 */
-        double[][] matrix = ILevelGenerator.getDistanceMatrix(nodes);
-        
-		/*
-		 * maps all nodes by origin(x,y)
-		 * this is required for the Delaunay Triangulation library because it only returns edges without any identifying properties, only points
-		 */
-		Map<String, INode> map = new HashMap<>();
-        
-        /*
-		 * holds all nodes in Vector2D format.
-		 * used for the Delaunay Triangulation library to calculate all the edges between nodes.
-		 * 
-		 */
-		Vector<Vector2D> pointSet = new Vector<>();		
-        
-        /*
-		 * holds all the edges that are produced from triangulation
-		 */
-		List<Edge> edges = new ArrayList<>();
-		
-		/**
-		 * counts the number of edges that are assigned to each node/vertex
-		 */
-		int[] edgeCount = new int[nodes.size()];
-
-		/**
-		 * a flag to indicate that an edge leading to the "end" room is created
-		 */
-		boolean isEndEdgeMet = false;
-		int endEdgeCount = 0;
-
-		// map all main rooms by origin(x,y) and build all edges.
-		for (INode node : nodes) {
-			Coords2D origin = node.getOrigin();
-			// map out the rooms by origin
-			map.put(origin.getX() + ":" + origin.getY(), node);
-			// convert coords into vector2d for triangulation
-			Vector2D v = new Vector2D(origin.getX(), origin.getY());
-//			LOGGER.debug(String.format("Room.id: %d = Vector2D: %s", node.getId(), v.toString()));
-			pointSet.add(v);
-		}
-
-		// triangulate the set of points
-		DelaunayTriangulator triangulator = null;
-		try {
-			triangulator = new DelaunayTriangulator(pointSet);
-			triangulator.triangulate();
-		}
-		catch(NotEnoughPointsException e) {
-			//LOGGER.warn("Not enough points where provided for triangulation. Level generation aborted.");
-			return edges;
-		}
-		catch(Exception e) {
-//			if (nodes !=null) {
-//				LOGGER.debug("rooms.size=" + nodes.size());
-//			}
-//			else {
-//				LOGGER.debug("Rooms is NULL!");
-//			}
-//			if (pointSet != null) {
-//				LOGGER.debug("Pointset.size=" + pointSet.size());
-//			}
-//			else {
-//				LOGGER.debug("Pointset is NULL!");
-//			}			
-			LOGGER.error("Unable to triangulate: ", e);
-		}
-
-		// retrieve all the triangles from triangulation
-		List<Triangle2D> triangles = triangulator.getTriangles();
-
-		for(Triangle2D triangle : triangles) {
-			// locate the corresponding rooms from the points of the triangles
-			INode node1 = map.get((int)triangle.a.x + ":" + (int)triangle.a.y);
-			INode node2 = map.get((int)triangle.b.x + ":" + (int)triangle.b.y);
-			INode node3 = map.get((int)triangle.c.x + ":" + (int)triangle.c.y);			
-
-			// build an edge based on room distance matrix
-			Edge edge = new Edge(node1.getId(), node2.getId(), matrix[node1.getId()][node2.getId()]/*matrix.get(ILevelGenerator.getKey(node1, node2))*/);
-			
-			// TODO for boss room, not necessarily end room
-			// remove any edges that lead to the end room(s) if the end room already has one edge
-			// remove (or don't add) any edges that lead to the end room if the end room already has it's maximum edges (degrees)
-			if (node1.getType() != NodeType.END && node2.getType() != NodeType.END) {
-//			if (!r1.getType().equals(Type.BOSS) && !r2.getType().equals(Type.BOSS)) {
-				edges.add(edge);
-			}
-			else if (node1.getType() == NodeType.START || node2.getType()  == NodeType.START) {
-				// skip if start joins the end
-			}
-			else if (!isEndEdgeMet) {
-				// add the edge
-				edges.add(edge);
-				// increment the number of edges leading to the end room
-				endEdgeCount++;
-				// get the end room
-				INode end = node1.getType() == NodeType.END ? node1 : node2;
-				if (endEdgeCount >= end.getMaxDegrees()) {
-					isEndEdgeMet = true;
-				}
-			}
-			
-			edge = new Edge(node2.getId(), node3.getId(), matrix[node2.getId()][node3.getId()]/*matrix.get(ILevelGenerator.getKey(node2, node3))*/);
-			if (node2.getType() != NodeType.END && node3.getType() != NodeType.END) {
-				edges.add(edge);
-			}
-			else if (node1.getType() == NodeType.START || node2.getType() == NodeType.START) {
-				// skip
-			}
-			else if (!isEndEdgeMet) {
-				edges.add(edge);
-				isEndEdgeMet = true;
-			}
-			
-			edge = new Edge(node1.getId(), node3.getId(), matrix[node1.getId()][node3.getId()]/*matrix.get(ILevelGenerator.getKey(node1, node3))*/);
-			if (node1.getType() != NodeType.END && node3.getType() != NodeType.END) {
-				edges.add(edge);
-			}
-			else if (node1.getType() == NodeType.START || node2.getType() == NodeType.START) {
-				// skip
-			}
-			else if (!isEndEdgeMet) {
-				edges.add(edge);
-				isEndEdgeMet = true;
-			}
-		}
-		return edges;
-	}
-	
 	/**
+	 * Returns a subset of rooms that meet the mean factor criteria. Start and End
+	 * rooms are included as main rooms. Note that the original list is updated as
+	 * well.
 	 * 
-	 * @param edges
-	 * @param mainRooms
-	 * @return
-	 */
-	public List<Edge> getPaths(Random random, List<Edge> edges, List<? extends INode> nodes) {
-		/*
-		 * paths are the reduced edges generated by the Minimun Spanning Tree
-		 */
-		List<Edge> paths = new ArrayList<>();
-		
-		/**
-		 * counts the number of edges that are assigned to each node/vertex
-		 */
-		int[] edgeCount = new int[nodes.size()];
-		
-		/*
-		 * Map to keep track of which edges for source list have already been used (in MST and extra edges)
-		 */
-		Map<String, Edge> usedEdges = new HashMap<>();
-		
-		// reduce all edges to MST
-		EdgeWeightedGraph graph = new EdgeWeightedGraph(nodes.size(), edges);
-		LazyPrimMST mst = new LazyPrimMST(graph);
-		for (Edge edge : mst.edges()) {
-//			if (nodeMap.containsKey(Integer.valueOf(e.v)) && nodeMap.containsKey(Integer.valueOf(e.w))) {
-			if (edge.v < nodes.size() && edge.w < nodes.size()) {
-				INode node1 = nodes.get(edge.v);
-				INode node2 = nodes.get(edge.w);	
-				// only add edge if max edges has not been met
-				if (edgeCount[node1.getId()] < node1.getMaxDegrees() && edgeCount[node2.getId()] < node2.getMaxDegrees()) {
-					paths.add(edge);
-					edgeCount[node1.getId()]++;
-					edgeCount[node2.getId()]++;
-				}
-			}
-			else {
-				//LOGGER.warn(String.format("Ignored Room: array out-of-bounds: v: %d, w: %d", edge.v, edge.w));
-			}
-		}		
-		
-		// add more edges
-		int addtionalEdges = (int) (edges.size() * this.pathFactor); // TODO get the % from config
-		for (int i = 0 ; i < addtionalEdges; i++) {
-			int pos = random.nextInt(edges.size());
-			Edge edge = edges.get(pos);
-			
-			// TODO ensure that only non-used edges are selected (and doesn't increment the counter)
-			// this would require a list of edges used, BUT first need to match up the edges from mst.edges and
-			// param edges - their array indexes wouldn't align.
-			INode node1 = nodes.get(edge.v);
-			INode node2 = nodes.get(edge.w);
-			if (node1.getType() != NodeType.END && node2.getType() != NodeType.END &&
-					edgeCount[node1.getId()] < node1.getMaxDegrees() && edgeCount[node2.getId()] < node2.getMaxDegrees()) {
-				paths.add(edge);
-				edgeCount[node1.getId()]++;
-				edgeCount[node2.getId()]++;				
-			}
-
-		}
-		return paths;
-	}
-	
-
-	/**
-	 * Returns a subset of rooms that meet the mean factor criteria. Start and End rooms are included as main rooms.
-	 * Note that the original list is updated as well.
 	 * @param rooms
 	 * @param meanFactor
 	 * @return
@@ -996,20 +824,20 @@ y += movementVector.getY();
 				mainRooms.add(room);
 			}
 		});
-		
+
 		return mainRooms;
 	}
 
-	// TODO currently this is updating the map that is passed in, not creating a new map
+	// TODO currently this is updating the map that is passed in, not creating a new
+	// map
 	public boolean[][] updateCellMap(boolean cellMap[][], List<IRoom> rooms) {
 		rooms.forEach(room -> {
 //			System.out.println("generating room @ (" + room.getOrigin().getX() + ", " + room.getOrigin().getY() + "), width=" + room.getBox().getWidth() + ", height=" + room.getBox().getHeight());
 			for (int w = 0; w < room.getBox().getWidth(); w++) {
 				for (int d = 0; d < room.getBox().getHeight(); d++) {
 					int x = room.getOrigin().getX() + w;
-					int z =  room.getOrigin().getY() + d;
-					if (x < 96 && z < 96
-							&& x >= 0 && z >= 0) {
+					int z = room.getOrigin().getY() + d;
+					if (x < 96 && z < 96 && x >= 0 && z >= 0) {
 						cellMap[room.getOrigin().getX() + w][room.getOrigin().getY() + d] = false;
 					}
 				}
@@ -1021,7 +849,9 @@ y += movementVector.getY();
 	/**
 	 * 
 	 * @param sourceRooms
-	 * @param movementFactor dictates how much to move a R at a time. lower number mean the Rs will be closer together but more iterations performed
+	 * @param movementFactor dictates how much to move a R at a time. lower number
+	 *                       mean the Rs will be closer together but more iterations
+	 *                       performed
 	 * @return
 	 */
 	public List<IRoom> separateRooms(List<IRoom> sourceRooms, int movementFactor) {
@@ -1032,10 +862,10 @@ y += movementVector.getY();
 		Coords2D center = getCenter(workingRooms);
 
 		boolean hasIntersections = true;
-		while (hasIntersections) {			
+		while (hasIntersections) {
 			hasIntersections = iterateSeparationStep(center, workingRooms, movementFactor);
 		}
-		
+
 		return workingRooms;
 	}
 
@@ -1061,7 +891,7 @@ y += movementVector.getY();
 	protected boolean[][] initMap(Random random) {
 		return initMap(this.width, this.height, random);
 	}
-	
+
 	/**
 	 * 
 	 * @param width
@@ -1073,7 +903,7 @@ y += movementVector.getY();
 		boolean[][] map = new boolean[width][height];
 		for (int x = 0; x < width; x++) {
 			for (int y = 0; y < height; y++) {
-					map[x][y] = true;
+				map[x][y] = true;
 			}
 		}
 		return map;
@@ -1095,28 +925,28 @@ y += movementVector.getY();
 	 * @param height
 	 * @return
 	 */
-	private List<IRoom> initRooms(Random random, final int width, final int height, final int minRoomSize, final int maxRoomSize) {
+	private List<IRoom> initRooms(Random random, final int width, final int height, final int minRoomSize,
+			final int maxRoomSize) {
 		List<IRoom> rooms = new ArrayList<>();
-		Coords2D centerPoint = new Coords2D(width/2, height / 2);
+		Coords2D centerPoint = new Coords2D(width / 2, height / 2);
 
 		// TODO needs to be centered on level
-		Rectangle2D levelBoundingBox = new Rectangle2D((centerPoint.getX() - spawnBoxWidth/2) - 8, (centerPoint.getY() - spawnBoxWidth/2) -8, spawnBoxWidth + 16, spawnBoxHeight +16);	
-		Rectangle2D spawnBoundingBox = new Rectangle2D(0, 0, spawnBoxWidth, spawnBoxHeight);	
-		
+		Rectangle2D levelBoundingBox = new Rectangle2D((centerPoint.getX() - spawnBoxWidth / 2) - 8,
+				(centerPoint.getY() - spawnBoxWidth / 2) - 8, spawnBoxWidth + 16, spawnBoxHeight + 16);
+		Rectangle2D spawnBoundingBox = new Rectangle2D(0, 0, spawnBoxWidth, spawnBoxHeight);
+
 		IRoom startRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
-		startRoom
-			.setRole(RoomRole.MAIN)
-			.setType(NodeType.START)
-			.setMaxDegrees(5)
-			.setId(0);		
+		startRoom.setRole(RoomRole.MAIN).setType(NodeType.START).setMaxDegrees(5).setId(0);
 		rooms.add(startRoom);
-		
-		// TEST[i like it] seed the level with small rooms that will be removed (but will bring down the mean size)
+
+		// TEST[i like it] seed the level with small rooms that will be removed (but
+		// will bring down the mean size)
 		for (int roomIndex = 0; roomIndex < 5; roomIndex++) { // TODO make the number of seed rooms variable
 			IRoom room = generateRoom(random, centerPoint, spawnBoundingBox, 5, 5); // TODO 5 -> make variable
 			// constrainsts check
 			if (!boundaryConstraint(levelBoundingBox, room)) {
-				LOGGER.debug("room at {} [w:{}, h:{}] failed boundaries test", room.getBox().getOrigin(), room.getBox().getWidth(), room.getBox().getHeight());
+				LOGGER.debug("room at {} [w:{}, h:{}] failed boundaries test", room.getBox().getOrigin(),
+						room.getBox().getWidth(), room.getBox().getHeight());
 				continue;
 			}
 			// set the id
@@ -1126,13 +956,14 @@ y += movementVector.getY();
 			rooms.add(room);
 			LOGGER.debug("seed room id -> {}, size -> {}", room.getId(), room.getBox());
 		}
-		
+
 		// TODO need to add start room and flagged
 		for (int roomIndex = 0; roomIndex < numberOfRooms; roomIndex++) {
 			IRoom room = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
 			// constrainsts check
 			if (!boundaryConstraint(levelBoundingBox, room)) {
-				LOGGER.debug("room at {} [w:{}, h:{}] failed boundaries test", room.getBox().getOrigin(), room.getBox().getWidth(), room.getBox().getHeight());
+				LOGGER.debug("room at {} [w:{}, h:{}] failed boundaries test", room.getBox().getOrigin(),
+						room.getBox().getWidth(), room.getBox().getHeight());
 				continue;
 			}
 			// set the id
@@ -1142,45 +973,39 @@ y += movementVector.getY();
 			rooms.add(room);
 			LOGGER.debug("room.id -> {}", room.getId());
 		}
-		
+
 		// have to have at least one end room
 		IRoom endRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
-		endRoom
-			.setRole(RoomRole.MAIN)	
-			.setType(NodeType.END)
-			.setMaxDegrees(1)
-			.setId(rooms.size()); // TODO check if still works without +1
+		endRoom.setRole(RoomRole.MAIN).setType(NodeType.END).setMaxDegrees(1).setId(rooms.size()); // TODO check if
+																									// still works
+																									// without +1
 		rooms.add(endRoom);
 		LOGGER.debug("end room id -> {}, size of list -> {}", endRoom.getId(), rooms.size());
-		
-		
-//		// testing: add a secret room
+
+//		// TEST: add a secret room
 //		IRoom secretRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
-//		secretRoom
-//			.setRole(RoomRole.MAIN)	
-//			.setType(NodeType.STANDARD)
-//			.setMaxDegrees(1)
-//			.setId(rooms.size());
+//		secretRoom.setRole(RoomRole.MAIN).setType(NodeType.STANDARD).setMaxDegrees(1).setId(rooms.size());
+//		secretRoom.getFlags().add(RoomFlag.ANCHOR);
 //		rooms.add(secretRoom);
 //		LOGGER.debug("secret room id -> {}, size of list -> {}", secretRoom.getId(), rooms.size());
-		
+
 		// TEST add anchor room
-		IRoom anchorRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
-//		anchorRoom.setBox(new Rectangle2D((int)centerPoint.getX() - (anchorRoom.getBox().getWidth()/2), (int)centerPoint.getY() - (anchorRoom.getBox().getHeight()/2), 5, 5));
-			anchorRoom.setRole(RoomRole.MAIN)	
-			.setMaxDegrees(5)
-			.setId(rooms.size()); // TODO check if still works without +1
-		anchorRoom.getFlags().add(RoomFlag.ANCHOR);
-		rooms.add(anchorRoom);
+//		IRoom anchorRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
+//			anchorRoom.setRole(RoomRole.MAIN)	
+//			.setMaxDegrees(5)
+//			.setId(rooms.size()); // TODO check if still works without +1
+//		anchorRoom.getFlags().add(RoomFlag.ANCHOR);
+//		rooms.add(anchorRoom);
 		
-		anchorRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
-//		anchorRoom.setBox(new Rectangle2D((int)centerPoint.getX() - (anchorRoom.getBox().getWidth()/2), (int)centerPoint.getY() - (anchorRoom.getBox().getHeight()/2), 5, 5));
-			anchorRoom.setRole(RoomRole.MAIN)	
-			.setMaxDegrees(5)
-			.setId(rooms.size()); // TODO check if still works without +1
-		anchorRoom.getFlags().add(RoomFlag.ANCHOR);
-		rooms.add(anchorRoom);
-		LOGGER.debug("anchor room id -> {}, size of list -> {}", anchorRoom.getId(), rooms.size());
+//		// TEST
+//		anchorRoom = generateRoom(random, centerPoint, levelBoundingBox, minRoomSize, maxRoomSize);
+//			anchorRoom.setRole(RoomRole.MAIN)	
+//			.setMaxDegrees(5)
+//			.setId(rooms.size()); // TODO check if still works without +1
+//		anchorRoom.getFlags().add(RoomFlag.ANCHOR);
+//		rooms.add(anchorRoom);
+//		LOGGER.debug("anchor room id -> {}, size of list -> {}", anchorRoom.getId(), rooms.size());
+
 		return rooms;
 	}
 
@@ -1211,139 +1036,72 @@ y += movementVector.getY();
 	 */
 	private IRoom generateRoom(Random random, Coords2D centerPoint, Rectangle2D boundingBox, int minRoomSize,
 			int maxRoomSize) {
-		
+
 		int sizeX = maxRoomSize == minRoomSize ? minRoomSize : random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
 		int sizeY = maxRoomSize == minRoomSize ? minRoomSize : random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
-		int offsetX = (random.nextInt(boundingBox.getWidth()) - (boundingBox.getWidth()/2)) - (sizeX / 2);
-		int offsetY = (random.nextInt(boundingBox.getHeight()) - (boundingBox.getHeight()/2)) - (sizeY / 2);		
+		int offsetX = (random.nextInt(boundingBox.getWidth()) - (boundingBox.getWidth() / 2)) - (sizeX / 2);
+		int offsetY = (random.nextInt(boundingBox.getHeight()) - (boundingBox.getHeight() / 2)) - (sizeY / 2);
 		IRoom room = new Room(new Coords2D(centerPoint.getX() + offsetX, centerPoint.getY() + offsetY), sizeX, sizeY);
 		return room;
 	}
 
-	/**
-	 * perform a breadth first search against the list of edges to determine if a path exists
-	 * from one node to another.
-	 * @param start
-	 * @param end
-	 * @param nodes
-	 * @param edges
-	 * @return
-	 */
-	@SuppressWarnings("unchecked")
-	protected boolean breadthFirstSearch(int start, int end, List<? extends INode> nodes, List<Edge> edges) {
-		// build an adjacency list
-		LinkedList<Integer> adj[];
-
-		adj = new LinkedList[nodes.size()];
-		for (INode r : nodes) {
-			adj[r.getId()] = new LinkedList<>();
-		}
-		
-        for (Edge e : edges) {
-        	adj[e.v].add(e.w);
-        	// add both directions to ensure all adjacencies are covered
-        	adj[e.w].add(e.v);     	
-        }
-
-		// mark all the vertices as not visited(By default set as false)
-		boolean visited[] = new boolean[nodes.size()];
-
-		// create a queue for BFS
-		LinkedList<Integer> queue = new LinkedList<Integer>();
-
-		// mark the current node as visited and enqueue it
-		visited[start]=true;
-		queue.add(start);
-
-		while (queue.size() != 0) {
-			// Dequeue a vertex from queue and print it
-			int s = queue.poll();
-
-			// get all adjacent vertices of the dequeued vertex s
-			// if a adjacent has not been visited, then mark it
-			// visited and enqueue it
-			Iterator<Integer> i = adj[s].listIterator();
-			while (i.hasNext()) {
-				int n = i.next();
-				if (n == end) return true;
-				
-				if (!visited[n]) {
-					visited[n] = true;
-					queue.add(n);
-				}
-			}
-		}		
-		return false;
-	}
-	
-	/**
-	 * 
-	 * @param workingRooms
-	 * @return
-	 */
-//	public Coords2D getCenter(List<IDungeonRoom> workingRooms) {
-//		IDungeonRoom boundingBox = getBoundingBox(workingRooms);
-//		Coords2D center = boundingBox.getCenter();
-//		return center;
-//	}
-	
 	public int getWidth() {
 		return width;
 	}
-	
+
 	public int getHeight() {
 		return height;
 	}
-	
+
 	public int getSpawnBoxWidth() {
 		return spawnBoxWidth;
 	}
-	
+
 	public int getSpawnBoxHeight() {
 		return spawnBoxHeight;
 	}
-	
+
 	public int getNumberOfRooms() {
 		return numberOfRooms;
 	}
-	
+
 	public int getMinRoomSize() {
 		return minRoomSize;
 	}
-	
+
 	public int getMaxRoomSize() {
 		return maxRoomSize;
 	}
-	
+
 	public int getMovementFactor() {
 		return movementFactor;
 	}
-	
+
 	public double getMeanFactor() {
 		return meanFactor;
 	}
-	
+
 	public double getPathFactor() {
 		return pathFactor;
 	}
-	
+
 	@Override
 	public ILevelGenerator withWidth(int width) {
 		this.width = width;
 		return this;
 	}
-	
+
 	@Override
 	public ILevelGenerator withHeight(int height) {
 		this.height = height;
 		return this;
 	}
-	
+
 	public DungeonLevelGenerator withSpawnBoxWidth(int width) {
 		this.spawnBoxWidth = width;
 		return this;
 	}
-	
+
 	public DungeonLevelGenerator withSpawnBoxHeight(int height) {
 		this.spawnBoxHeight = height;
 		return this;
@@ -1353,27 +1111,27 @@ y += movementVector.getY();
 		this.numberOfRooms = num;
 		return this;
 	}
-	
+
 	public DungeonLevelGenerator withMinRoomSize(int num) {
 		this.minRoomSize = num;
 		return this;
 	}
-	
+
 	public DungeonLevelGenerator withMaxRoomSize(int num) {
 		this.maxRoomSize = num;
 		return this;
 	}
-	
+
 	public DungeonLevelGenerator withMovementFactor(int factor) {
 		this.movementFactor = factor;
 		return this;
 	}
-	
+
 	public DungeonLevelGenerator withMeanFactor(double factor) {
 		this.meanFactor = factor;
 		return this;
 	}
-	
+
 	public DungeonLevelGenerator withPathFactor(double factor) {
 		this.pathFactor = factor;
 		return this;
@@ -1386,7 +1144,7 @@ y += movementVector.getY();
 	public void setHardBoundary(boolean hardBoundary) {
 		this.hardBoundary = hardBoundary;
 	}
-	
+
 	/// TEMP
 	/**
 	 * 

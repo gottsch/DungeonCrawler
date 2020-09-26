@@ -13,6 +13,7 @@ public class Wayline {
 	private WayConnector connector1;
 	private WayConnector connector2;
 	private Rectangle2D box;
+	private Wayline relatedSegment;
 	
 	public Wayline() {}
 	
@@ -52,6 +53,15 @@ public class Wayline {
 
 	@Override
 	public String toString() {
-		return "Wayline [connector1=" + connector1 == null ? "null" : connector1 + ", connector2=" + connector2 == null ? "null" : connector2 + ", box=" + box == null ? "null" : box + "]";
+		return "Wayline [connector1=" + connector1 == null ? "null" : connector1 + ", connector2=" + connector2 == null ? "null" : connector2 + ", box=" + box == null ? "null" : box +
+				", related to=" + relatedSegment == null ? "null" : relatedSegment +"]";
+	}
+
+	public Wayline getRelatedSegment() {
+		return relatedSegment;
+	}
+
+	public void setRelatedSegment(Wayline relatedSegment) {
+		this.relatedSegment = relatedSegment;
 	}
 }

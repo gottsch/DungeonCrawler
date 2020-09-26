@@ -16,7 +16,7 @@ import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
  *
  */
 // TODO extends AbstractGraphNode
-public class Room implements IRoom {
+public class Room implements IRoom, IDungeonElement {
 	private int id;
 	private Rectangle2D box;
 	private int maxDegrees;
