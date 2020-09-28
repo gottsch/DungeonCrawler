@@ -170,5 +170,10 @@ public class Room implements IRoom, IDungeonElement {
 	public void setFlags(List<RoomFlag> flags) {
 		this.flags = flags;
 	}
+	
+	@Override
+	public boolean hasFlag(RoomFlag flag) {
+		return getFlags().contains(flag);
+	}
 
 }

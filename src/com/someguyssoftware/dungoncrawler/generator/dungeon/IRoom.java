@@ -25,5 +25,7 @@ public interface IRoom extends INode {
 	
 	List<RoomFlag> getFlags();
 	void setFlags(List<RoomFlag> flags);
+	boolean hasFlag(RoomFlag flag);
+	
 	
 }

@@ -81,6 +81,8 @@ public class DungeonVisualizer extends Application {
 	private boolean showEdges = false;
 	private boolean showPaths = false;
 	private boolean showWaylines = false;
+	private boolean showCorridors = true;
+	private boolean showExits = true;
 
 	/**
 	 * @param args
@@ -213,10 +215,14 @@ public class DungeonVisualizer extends Application {
 		});
 
 		// add corridors
-		addCorridors(level, group);
+		if (showCorridors) {
+			addCorridors(level, group);
+		}
 		
 		// add all the exits (rooms and corridors)
-		addExits(level, group);
+		if (showExits) {
+			addExits(level, group);
+		}
 		
 		// add a center rectangle
 		if (showCenterPoint) {
@@ -613,6 +619,16 @@ public class DungeonVisualizer extends Application {
 		// show waylines
 		HBox showWaylinesBox = addToggle("Show Waylines:", showWaylines, labels, hBoxes, (visualizer, bool) -> {
 			visualizer.setShowWaylines(bool);
+		});
+		
+		// show corridors
+		HBox showCorridorsBox = addToggle("Show Corridors:", showCorridors, labels, hBoxes, (visualizer, bool) -> {
+			visualizer.setShowCorridors(bool);
+		});
+		
+		// show exits
+		HBox showExitsBox = addToggle("Show Exits:", showExits, labels, hBoxes, (visualizer, bool) -> {
+			visualizer.setShowExits(bool);
 		});		
 
 		// buttons
@@ -668,7 +684,7 @@ public class DungeonVisualizer extends Application {
 			}
 		});
 
-		// TODO moves to the next iteration
+		// moves to the next iteration
 		iterationButton.setOnAction(new EventHandler<ActionEvent>() {
 			@Override public void handle(ActionEvent e) {
 				System.out.println("hasIntersections=" + hasIntersections);
@@ -710,7 +726,8 @@ public class DungeonVisualizer extends Application {
 				spawnBoundaryWidthBox, spawnBoundaryHeightBox, 
 				numRoomsBox, minRoomSizeBox, maxRoomSizeBox, 
 				movementFactorBox, meanFactorBox, pathFactorBox, 
-				showGridBox, showCenterPointBox, showSpawnBoundaryBox, showNonRoomsBox, showEdgesBox, showPathsBox, showWaylinesBox, 
+				showGridBox, showCenterPointBox, showSpawnBoundaryBox, showNonRoomsBox, showEdgesBox, showPathsBox,
+				showWaylinesBox, showCorridorsBox, showExitsBox,
 				buttonsBox, buttonsBox2);
 	}
 
@@ -817,5 +834,21 @@ public class DungeonVisualizer extends Application {
 
 	public void setShowGrid(boolean showGrid) {
 		this.showGrid = showGrid;
+	}
+
+	public boolean isShowCorridors() {
+		return showCorridors;
+	}
+
+	public void setShowCorridors(boolean showCorridors) {
+		this.showCorridors = showCorridors;
+	}
+
+	public boolean isShowExits() {
+		return showExits;
+	}
+
+	public void setShowExits(boolean showExits) {
+		this.showExits = showExits;
 	}
 }

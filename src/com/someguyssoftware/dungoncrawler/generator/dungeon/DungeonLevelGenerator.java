@@ -5,15 +5,19 @@ package com.someguyssoftware.dungoncrawler.generator.dungeon;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.ai.astar.AStarOrthogonal;
+import com.ai.astar.Orthogonal;
 import com.someguyssoftware.dungoncrawler.generator.AbstractGraphLevelGenerator;
 import com.someguyssoftware.dungoncrawler.generator.Axis;
 import com.someguyssoftware.dungoncrawler.generator.Coords2D;
@@ -226,12 +230,8 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		boolean hasIntersections = false;
 		int totalMovement = 0;
 
-		// TODO add checks for anchor rooms ex. start and end
-
 		for (IRoom room : rooms) {
-			// TODO what if multiple anchor rooms overlap?
-			// TODO anchor rooms can cause other rooms to get stuck in an overlap position
-			// -> infinite loop -> need a escape
+
 			if (room.getFlags().contains(RoomFlag.ANCHOR)) {
 				continue;
 			}
@@ -619,16 +619,19 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	}
 
 	/**
-	 * Waylines is a dungeon method, not a graph method, so use IDungeonRoom instead
+	 * NOTE if the rooms overlap each other on a single axis, they are "close"
+	 * enough that a single wayline (not-elbow) can be used to connect them.
+	 * ex. a = (1,1) -> (10, 10), b = (5, 15) - (15,25): the room don't intersect
+	 * but the x-axis values do, allowing a single vertical wayline to connect them.
 	 * of INodes
 	 * 
 	 * @param rand
 	 * @param paths
-	 * @param nodes
+	 * @param rooms
 	 * @param factory
 	 * @return
 	 */
-	protected List<Wayline> getWaylines(Random rand, List<Edge> paths, List<? extends INode> nodes) {
+	public List<Wayline> getWaylines(Random rand, List<Edge> paths, List<IRoom> rooms) {
 
 		/*
 		 * a list of a the waylines constructed from paths
@@ -637,70 +640,226 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		List<Wayline> waylines = new ArrayList<>();
 
 		for (Edge path : paths) {
-			// get the nodes
-			INode node1 = nodes.get(path.v);
-			INode node2 = nodes.get(path.w);
-
-			/*
-			 * NOTE if the rooms overlap each other on a single axis, they are "close"
-			 * enough that a single wayline (not-elbow) can be used to connect them.
-			 */
+			// get the rooms
+			IRoom room1 = rooms.get(path.v);
+			IRoom room2 = rooms.get(path.w);
 
 			// horizontal wayline (east-west)
-			if (checkHorizontalConnectivity(node1, node2)) {
-				Wayline wayline = getHorizontalWayline(node1, node2);
+			if (checkHorizontalConnectivity(room1, room2)) {
+				Wayline wayline = getHorizontalWayline(room1, room2);
 //				LOGGER.debug("horizontal wayline final -> {}", wayline);
-				waylines.add(wayline);
+				Optional<List<IRoom>> intersectRooms = getIntersects(wayline, rooms, room1, room2);
+				if (intersectRooms.isPresent()) {
+					Optional<List<Wayline>> aStarWaylines = findAStarPath(wayline, intersectRooms.get());
+					if (aStarWaylines.isPresent()) {
+						waylines.addAll(aStarWaylines.get());
+						// TEMP
+						aStarWaylines.get().forEach(w -> {
+							LOGGER.debug("horizontal w: c1 -> {}, c2-> {}", w.getConnector1().getCoords(), w.getConnector2().getCoords());
+						});
+					}
+				}
+				else {
+					waylines.add(wayline);
+				}
 			}
 			// vertical wayline (north-south)
-			else if (checkVerticalConnectivity(node1, node2)) {
-				Wayline wayline = getVerticalWayline(node1, node2);
-				waylines.add(wayline);
+			else if (checkVerticalConnectivity(room1, room2)) {
+				Wayline wayline = getVerticalWayline(room1, room2);
+				Optional<List<IRoom>> intersectRooms = getIntersects(wayline, rooms, room1, room2);
+				if (intersectRooms.isPresent()) {
+					Optional<List<Wayline>> aStarWaylines = findAStarPath(wayline, intersectRooms.get());
+					if (aStarWaylines.isPresent()) {
+						waylines.addAll(aStarWaylines.get());
+						// TEMP
+						aStarWaylines.get().forEach(w -> {
+							LOGGER.debug(" vertical w: c1 -> {}, c2-> {}", w.getConnector1().getCoords(), w.getConnector2().getCoords());
+						});				
+					}
+				}
+				else {
+					waylines.add(wayline);
+				}
 			}
 			// elbow wayline
 			else {
-				Coords2D node1Center = node1.getCenter();
+				Coords2D node1Center = room1.getCenter();
 
 				WayConnector connector1 = null;
 				// node2 is to the right/east/positive-x of node1
-				if (node2.getCenter().getX() > node1.getCenter().getX()) {
-					connector1 = new WayConnector(new Coords2D(node1.getMaxX() - 1, node1Center.getY()), (IRoom) node1);
+				if (room2.getCenter().getX() > room1.getCenter().getX()) {
+					connector1 = new WayConnector(new Coords2D(room1.getMaxX() - 1, node1Center.getY()), (IRoom) room1);
 				}
 				// node2 is to the left/west/negative-x of node1
 				else {
 					// NOTE only thing that is differences from if() is that node1p uses minX as
 					// opposed to maxX and the +1/-1
-					connector1 = new WayConnector(new Coords2D(node1.getMinX() + 1, node1Center.getY()), (IRoom) node1);
+					connector1 = new WayConnector(new Coords2D(room1.getMinX() + 1, node1Center.getY()), (IRoom) room1);
 				}
 
 				// NOTE connector2 is the "destination" or "joint" node, so it should be shared
 				// with both segments
-				WayConnector connector2 = new WayConnector(new Coords2D(node2.getCenter().getX(), node1Center.getY()),
+				WayConnector connector2 = new WayConnector(new Coords2D(room2.getCenter().getX(), node1Center.getY()),
 						null);
 				Wayline wayline1 = new Wayline(connector1, connector2);
 
 				// room2 is up (postivie-y) of room 1
-				if (node2.getCenter().getY() > node1.getCenter().getY()) {
-					connector1 = new WayConnector(new Coords2D(node2.getCenter().getX(), node2.getMinY() + 1),
-							(IRoom) node2);
+				if (room2.getCenter().getY() > room1.getCenter().getY()) {
+					connector1 = new WayConnector(new Coords2D(room2.getCenter().getX(), room2.getMinY() + 1),
+							(IRoom) room2);
 				}
 				// room2 is down (negative-y) of room 1
 				else {
-					connector1 = new WayConnector(new Coords2D(node2.getCenter().getX(), node2.getMaxY() - 1),
-							(IRoom) node2);
+					connector1 = new WayConnector(new Coords2D(room2.getCenter().getX(), room2.getMaxY() - 1),
+							(IRoom) room2);
 				}
 				Wayline wayline2 = new Wayline(connector1, connector2);
 				if (wayline1 != null && wayline2 != null) {
-					waylines.add(wayline1);
-					waylines.add(wayline2);
-					// relate the waylines to each other
-					wayline1.setRelatedSegment(wayline2);
-					wayline2.setRelatedSegment(wayline1);
-//					LOGGER.debug("adding elbow wayline -> {}\n-> {}", wayline1, wayline2);
+					Optional<List<IRoom>> intersectRooms1 = getIntersects(wayline1, rooms, room1, room2);
+					Optional<List<IRoom>> intersectRooms2 = getIntersects(wayline2, rooms, room1, room2);
+					if (intersectRooms1.isPresent() || intersectRooms2.isPresent()) {
+						// create a new single list
+						Set<IRoom> combinedSet = new HashSet<>(intersectRooms1.orElse(new ArrayList<>()));
+						combinedSet.addAll(intersectRooms2.orElse(new ArrayList<>()));
+						List<IRoom> combinedRooms = new ArrayList<>(combinedSet);
+
+						// crate a new wayline from room to room
+						if (!combinedRooms.isEmpty()) {
+							Wayline wayline = new Wayline(
+									wayline1.getConnector1() == null ? wayline1.getConnector2() : wayline1.getConnector1(),
+									wayline2.getConnector1() == null ? wayline2.getConnector2() : wayline2.getConnector1()
+									);
+							Optional<List<Wayline>> aStarWaylines = findAStarPath(wayline, combinedRooms);
+							if (aStarWaylines.isPresent()) {
+								waylines.addAll(aStarWaylines.get());
+								// TEMP
+								aStarWaylines.get().forEach(w -> {
+									LOGGER.debug("elbow w: c1 -> {}, c2-> {}", w.getConnector1().getCoords(), w.getConnector2().getCoords());
+								});
+							}
+						}
+					}
+					else {
+						waylines.add(wayline1);
+						waylines.add(wayline2);
+						wayline1.setNext(wayline2);
+						wayline2.setNext(null);
+						LOGGER.debug("adding elbow wayline -> {}\n-> {}", wayline1, wayline2);
+					}
 				}
 			}
 		}
 		return waylines;
+	}
+
+	/**
+	 * 
+	 * @param wayline
+	 * @param rooms
+	 * @param room1
+	 * @param room2
+	 * @return
+	 */
+	private Optional<List<IRoom>> getIntersects(final Wayline wayline, final List<IRoom> rooms, final IRoom room1, final IRoom room2) {
+		List<IRoom> intersectRooms = new ArrayList<>();
+		rooms.forEach(room -> {
+			if (room == room1 || room == room2 ) {
+				return;
+			}
+			if (intersects(room, wayline)) {
+				if(room.hasFlag(RoomFlag.NO_INTERSECTION)) {
+					LOGGER.debug("room -> {} is flagged as no itersection from room -> {} to room -> {}", room.getId(), room1.getId(), room2.getId());
+					intersectRooms.add(room);
+				}
+			}
+		});
+		if (intersectRooms.isEmpty()) {
+			return Optional.empty();
+		}
+		return Optional.of(intersectRooms);
+	}
+
+	/**
+	 * 
+	 * @param waylineIn
+	 * @param intersectRooms
+	 * @return
+	 */
+	private Optional<List<Wayline>> findAStarPath(Wayline waylineIn, List<IRoom> intersectRooms) {
+		// convert list of rooms into a boolean map
+		// TODO add the destination room as a blocker outline with various entry points (non-blocker cells)
+		boolean [][] map = new boolean[width][height];
+		intersectRooms.forEach(room -> {
+			for (int x = 0; x < room.getBox().getWidth(); x++) {
+				for (int y = 0; y < room.getBox().getHeight(); y++) {
+					map[room.getOrigin().getX() + x][room.getOrigin().getY() + y] = true;
+				}
+			}
+		});
+		
+		AStarOrthogonal aStar = new AStarOrthogonal(map);
+		Optional<List<com.ai.astar.Node>> nodes = aStar.findPath(
+				new com.ai.astar.Node(waylineIn.getConnector1().getCoords().getX(), waylineIn.getConnector1().getCoords().getY()), 
+				new com.ai.astar.Node(waylineIn.getConnector2().getCoords().getX(), waylineIn.getConnector2().getCoords().getY()));
+		
+		if (nodes.isPresent()) {
+			List<Wayline> waylines = new ArrayList<>();
+			com.ai.astar.Node startNode = null;
+			com.ai.astar.Node lastNode = null;
+			short direction = -1;
+			short lastDirection = -1;
+			for (com.ai.astar.Node node : nodes.get()) {
+				LOGGER.debug("astar node -> {}", node.toString());
+				if (startNode == null) {
+					startNode = node;
+					lastNode = node;
+				}
+				else {
+					// travelling along x-axis
+					if (node.getCol() == lastNode.getCol()) {
+						direction = 0;
+						if (lastDirection == -1) {
+							lastDirection = direction;
+						}
+						if (direction != lastDirection) {
+							// create wayline from startNode to lastNode
+							waylines.add(new Wayline(
+									new WayConnector(	new Coords2D(startNode.getRow(), startNode.getCol())), 
+									new WayConnector(new Coords2D(lastNode.getRow(), lastNode.getCol()))
+									));
+							
+							startNode = lastNode;
+						}
+					}
+					else {
+						// travelling along y-axis
+						direction = 1;
+						if (lastDirection == -1) {
+							lastDirection = direction;
+						}
+						if (direction != lastDirection) {
+							// create wayline from start to lastNode
+							waylines.add(new Wayline(
+									new WayConnector(	new Coords2D(startNode.getRow(), startNode.getCol())), 
+									new WayConnector(new Coords2D(lastNode.getRow(), lastNode.getCol()))
+									));
+							startNode = lastNode;
+						}
+					}
+					lastNode = node;
+					lastDirection = direction;
+				}
+			}
+			// create a wayline for the last element
+			Wayline wayline = new Wayline(
+					new WayConnector(	new Coords2D(startNode.getRow(), startNode.getCol())), 
+					new WayConnector(new Coords2D(lastNode.getRow(), lastNode.getCol()))
+					);
+			waylines.add(wayline);
+			return Optional.of(waylines);
+		}
+
+		return Optional.empty();
 	}
 
 	/**
@@ -937,6 +1096,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 
 		IRoom startRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
 		startRoom.setRole(RoomRole.MAIN).setType(NodeType.START).setMaxDegrees(5).setId(0);
+		startRoom.getFlags().add(RoomFlag.NO_INTERSECTION);
 		rooms.add(startRoom);
 
 		// TEST[i like it] seed the level with small rooms that will be removed (but
@@ -976,9 +1136,8 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 
 		// have to have at least one end room
 		IRoom endRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
-		endRoom.setRole(RoomRole.MAIN).setType(NodeType.END).setMaxDegrees(1).setId(rooms.size()); // TODO check if
-																									// still works
-																									// without +1
+		endRoom.setRole(RoomRole.MAIN).setType(NodeType.END).setMaxDegrees(1).setId(rooms.size());
+		endRoom.getFlags().add(RoomFlag.NO_INTERSECTION);
 		rooms.add(endRoom);
 		LOGGER.debug("end room id -> {}, size of list -> {}", endRoom.getId(), rooms.size());
 
@@ -993,7 +1152,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 //		IRoom anchorRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
 //			anchorRoom.setRole(RoomRole.MAIN)	
 //			.setMaxDegrees(5)
-//			.setId(rooms.size()); // TODO check if still works without +1
+//			.setId(rooms.size()); 
 //		anchorRoom.getFlags().add(RoomFlag.ANCHOR);
 //		rooms.add(anchorRoom);
 		
@@ -1001,7 +1160,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 //		anchorRoom = generateRoom(random, centerPoint, levelBoundingBox, minRoomSize, maxRoomSize);
 //			anchorRoom.setRole(RoomRole.MAIN)	
 //			.setMaxDegrees(5)
-//			.setId(rooms.size()); // TODO check if still works without +1
+//			.setId(rooms.size());
 //		anchorRoom.getFlags().add(RoomFlag.ANCHOR);
 //		rooms.add(anchorRoom);
 //		LOGGER.debug("anchor room id -> {}, size of list -> {}", anchorRoom.getId(), rooms.size());
