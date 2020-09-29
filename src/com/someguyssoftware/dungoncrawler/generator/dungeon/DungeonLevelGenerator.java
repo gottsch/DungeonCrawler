@@ -64,11 +64,11 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	public ILevel init() {
 		DungeonLevel dungeonData = new DungeonLevel();
 		Random random = new Random();
-		boolean[][] cellMap = initMap(random);
+		boolean[][] cellMap = new boolean[width][height];	//initMap(random);
 
 		List<IRoom> rooms = initRooms(random);
 		Map<Integer, IRoom> roomMap = mapRooms(rooms);
-		cellMap = updateCellMap(cellMap, rooms);
+//		cellMap = updateCellMap(cellMap, rooms, null);
 
 		dungeonData.setCellMap(cellMap);
 		dungeonData.setRooms(rooms);
@@ -107,10 +107,9 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		List<IRoom> orderedRooms = new LinkedList<>();
 		for (IRoom room : mainRooms) {
 			orderedRooms.add(room);
-			// TEST
-			int id = room.getId();
+			// reset the ids of the rooms to remain < size of the array
 			room.setId(orderedRooms.size() - 1);
-			LOGGER.debug("room id -> {} changed to -> {}", id, room.getId());
+//			LOGGER.debug("room id -> {} changed to -> {}", id, room.getId());
 			if (room.getType() == NodeType.START) {
 				start = room;
 			} else if (room.getType() == NodeType.END) {
@@ -159,7 +158,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		
 
 		// TODO will take the corridor edges as well
-		cellMap = updateCellMap(cellMap, orderedRooms);
+		cellMap = updateCellMap(cellMap, orderedRooms, corridors);
 
 		// save cell map and rooms to the level
 		dungeonData.setCellMap(cellMap);
@@ -467,19 +466,31 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 								&& corridor2.getBox().getMinX() < corridor1.getBox().getMaxX()) {
 							corridor1.getExits()
 									.add(new Coords2D(corridor2.getBox().getMinX(), corridor1.getBox().getCenterY()));
-						} else {
+						} 
+//						else {
+//							corridor1.getExits()
+//									.add(new Coords2D(corridor2.getBox().getMaxX(), corridor1.getBox().getCenterY()));
+//						}
+						if (corridor2.getBox().getMaxX() > corridor1.getBox().getMinX()
+								&& corridor2.getBox().getMaxX() < corridor1.getBox().getMaxX()) {
 							corridor1.getExits()
 									.add(new Coords2D(corridor2.getBox().getMaxX(), corridor1.getBox().getCenterY()));
-						}
+						} 						
 					} else if (corridor1.getAxis() == Axis.Y && corridor2.getAxis() == Axis.X) {
 						if (corridor2.getBox().getMinY() > corridor1.getBox().getMinY()
 								&& corridor2.getBox().getMinY() < corridor1.getBox().getMaxY()) {
 							corridor1.getExits()
 									.add(new Coords2D(corridor1.getBox().getCenterX(), corridor2.getBox().getMinY()));
-						} else {
+						}
+//						else {
+//							corridor1.getExits()
+//									.add(new Coords2D(corridor1.getBox().getCenterX(), corridor2.getBox().getMaxY()));
+//						}
+						if (corridor2.getBox().getMaxY() > corridor1.getBox().getMinY()
+								&& corridor2.getBox().getMaxY() < corridor1.getBox().getMaxY()) {
 							corridor1.getExits()
 									.add(new Coords2D(corridor1.getBox().getCenterX(), corridor2.getBox().getMaxY()));
-						}
+						}						
 					}
 				}
 
@@ -723,7 +734,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 						combinedSet.addAll(intersectRooms2.orElse(new ArrayList<>()));
 						List<IRoom> combinedRooms = new ArrayList<>(combinedSet);
 
-						// crate a new wayline from room to room
+						// create a new wayline from room to room
 						if (!combinedRooms.isEmpty()) {
 							Wayline wayline = new Wayline(
 									wayline1.getConnector1() == null ? wayline1.getConnector2() : wayline1.getConnector1(),
@@ -744,7 +755,6 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 						waylines.add(wayline2);
 						wayline1.setNext(wayline2);
 						wayline2.setNext(null);
-						LOGGER.debug("adding elbow wayline -> {}\n-> {}", wayline1, wayline2);
 					}
 				}
 			}
@@ -787,7 +797,6 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 */
 	private Optional<List<Wayline>> findAStarPath(Wayline waylineIn, List<IRoom> intersectRooms) {
 		// convert list of rooms into a boolean map
-		// TODO add the destination room as a blocker outline with various entry points (non-blocker cells)
 		boolean [][] map = new boolean[width][height];
 		intersectRooms.forEach(room -> {
 			for (int x = 0; x < room.getBox().getWidth(); x++) {
@@ -796,6 +805,19 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 				}
 			}
 		});
+		// add the target rooms with perforated outlines as blocked in the path map
+		List<IRoom> targetRooms = new ArrayList<>();
+		targetRooms.add(waylineIn.getConnector1().getRoom());
+		targetRooms.add(waylineIn.getConnector2().getRoom());
+		targetRooms.forEach(room -> {
+			for (int x = 0; x < room.getBox().getWidth(); x++) {
+				for (int y = 0; y < room.getBox().getHeight(); y++) {
+					if ((x ==0 && y % 2 == 1) || (y == 0 && x % 2 ==1)) {
+						map[room.getOrigin().getX() + x][room.getOrigin().getY() + y] = true;
+					}
+				}
+			}
+		});		
 		
 		AStarOrthogonal aStar = new AStarOrthogonal(map);
 		Optional<List<com.ai.astar.Node>> nodes = aStar.findPath(
@@ -823,11 +845,13 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 						}
 						if (direction != lastDirection) {
 							// create wayline from startNode to lastNode
-							waylines.add(new Wayline(
+							Wayline wayline = new Wayline(
 									new WayConnector(	new Coords2D(startNode.getRow(), startNode.getCol())), 
 									new WayConnector(new Coords2D(lastNode.getRow(), lastNode.getCol()))
-									));
-							
+									);
+							if(!insideRooms(wayline, targetRooms)) {
+								waylines.add(wayline);
+							}
 							startNode = lastNode;
 						}
 					}
@@ -839,10 +863,14 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 						}
 						if (direction != lastDirection) {
 							// create wayline from start to lastNode
-							waylines.add(new Wayline(
+							Wayline wayline = new Wayline(
 									new WayConnector(	new Coords2D(startNode.getRow(), startNode.getCol())), 
 									new WayConnector(new Coords2D(lastNode.getRow(), lastNode.getCol()))
-									));
+									);
+							if(!insideRooms(wayline, targetRooms)) {
+								waylines.add(wayline);
+							}
+
 							startNode = lastNode;
 						}
 					}
@@ -855,11 +883,28 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 					new WayConnector(	new Coords2D(startNode.getRow(), startNode.getCol())), 
 					new WayConnector(new Coords2D(lastNode.getRow(), lastNode.getCol()))
 					);
-			waylines.add(wayline);
+			if(!insideRooms(wayline, targetRooms)) {
+				waylines.add(wayline);
+			}
 			return Optional.of(waylines);
 		}
 
 		return Optional.empty();
+	}
+
+	private boolean insideRooms(Wayline wayline, List<IRoom> targetRooms) {
+		for (IRoom room : targetRooms) {
+			Coords2D coords1 = wayline.getConnector1().getCoords();
+			Coords2D coords2 = wayline.getConnector2().getCoords();
+			if (coords1.getX() > room.getMinX() && coords1.getX() < room.getMaxX()
+					&& coords1.getY() > room.getMinY() && coords1.getY() < room.getMaxY()
+				&& coords2.getX() > room.getMinX() && coords2.getX() < room.getMaxX()
+				&& coords2.getY() > room.getMinY() && coords2.getY() < room.getMaxY()) {
+				LOGGER.debug("not adding wayline because it is entirely within room -> {}", room.getId());
+				return true;
+			}
+		};
+		return false;
 	}
 
 	/**
@@ -989,22 +1034,40 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 
 	// TODO currently this is updating the map that is passed in, not creating a new
 	// map
-	public boolean[][] updateCellMap(boolean cellMap[][], List<IRoom> rooms) {
+	public boolean[][] updateCellMap(boolean cellMap[][], List<IRoom> rooms, List<Corridor> corridors) {
 		rooms.forEach(room -> {
 //			System.out.println("generating room @ (" + room.getOrigin().getX() + ", " + room.getOrigin().getY() + "), width=" + room.getBox().getWidth() + ", height=" + room.getBox().getHeight());
 			for (int w = 0; w < room.getBox().getWidth(); w++) {
 				for (int d = 0; d < room.getBox().getHeight(); d++) {
 					int x = room.getOrigin().getX() + w;
-					int z = room.getOrigin().getY() + d;
-					if (x < 96 && z < 96 && x >= 0 && z >= 0) {
-						cellMap[room.getOrigin().getX() + w][room.getOrigin().getY() + d] = false;
+					int y = room.getOrigin().getY() + d;
+					if ( x >= 0 && y >= 0 && x < getWidth() && y < getHeight()) {
+						cellMap[room.getOrigin().getX() + w][room.getOrigin().getY() + d] = true;
 					}
 				}
 			}
 		});
+		
+		if (corridors == null || corridors.isEmpty()) return cellMap;
+		
+		corridors.forEach(corridor -> {
+			for (int w = 0; w < corridor.getBox().getWidth(); w++) {
+				for (int d = 0; d < corridor.getBox().getHeight(); d++) {
+					int x = corridor.getBox().getOrigin().getX() + w;
+					int y = corridor.getBox().getOrigin().getY() + d;
+					if ( x >= 0 && y >= 0 && x < getWidth() && y < getHeight()) {
+						// turn on only cells that aren't turned on yet (necessary check? - yes, beause in future it won't be boolean but tile stack)
+						if (!cellMap[corridor.getBox().getOrigin().getX() + w][corridor.getBox().getOrigin().getY() + d])
+						cellMap[corridor.getBox().getOrigin().getX() + w][corridor.getBox().getOrigin().getY() + d] = true;
+					}
+				}
+			}
+		});
+		
 		return cellMap;
 	}
 
+	
 	/**
 	 * 
 	 * @param sourceRooms
@@ -1095,6 +1158,8 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		Rectangle2D spawnBoundingBox = new Rectangle2D(0, 0, spawnBoxWidth, spawnBoxHeight);
 
 		IRoom startRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
+		// TEST
+		startRoom.setOrigin(new Coords2D(80, 20));
 		startRoom.setRole(RoomRole.MAIN).setType(NodeType.START).setMaxDegrees(5).setId(0);
 		startRoom.getFlags().add(RoomFlag.NO_INTERSECTION);
 		rooms.add(startRoom);
@@ -1131,11 +1196,13 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 			room.setMaxDegrees(5); // TODO get from generator
 			// add to list
 			rooms.add(room);
-			LOGGER.debug("room.id -> {}", room.getId());
+//			LOGGER.debug("room.id -> {}", room.getId());
 		}
 
 		// have to have at least one end room
 		IRoom endRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
+		// TEST
+		endRoom.setOrigin(new Coords2D(20, 80));
 		endRoom.setRole(RoomRole.MAIN).setType(NodeType.END).setMaxDegrees(1).setId(rooms.size());
 		endRoom.getFlags().add(RoomFlag.NO_INTERSECTION);
 		rooms.add(endRoom);

@@ -61,7 +61,7 @@ public class DungeonVisualizer extends Application {
 	private static final Paint MAIN_ROOM_COLOR = Color.DARKBLUE;
 	private static final Paint AUXILILARY_ROOM_COLOR =Color.PURPLE;
 	private static final Paint NOT_INCLUDED_ROOM_COLOR = Color.GREY;
-	private static final Paint ROOM_FLOOR_COLOR = Color.DARKSLATEGREY;
+	private static final Paint ROOM_FLOOR_COLOR = Color.rgb(32, 32, 32);	//Color.DARKSLATEGREY;
 
 	private DungeonLevelGenerator dungeonGenerator = new DungeonLevelGenerator();
 	private Random random = new Random();
@@ -71,8 +71,8 @@ public class DungeonVisualizer extends Application {
 
 	private int startX = 0;
 	private int startY = 0;
-	private int tileWidth = 5;
-	private int tileHeight = 5;
+	private int tileWidth = 8;
+	private int tileHeight = 8;
 
 	private boolean showGrid = true;
 	private boolean showCenterPoint = false;
@@ -84,6 +84,8 @@ public class DungeonVisualizer extends Application {
 	private boolean showCorridors = true;
 	private boolean showExits = true;
 
+	private boolean[][] roomMap;
+	private boolean[][] corridorMap;
 	/**
 	 * @param args
 	 */
@@ -97,8 +99,8 @@ public class DungeonVisualizer extends Application {
 	@Override
 	public void start(Stage stage) throws Exception {
 		// setup the stage
-		stage.setWidth(800);
-		stage.setHeight(530);
+		stage.setWidth(1200);
+		stage.setHeight(1020);
 		stage.setTitle("Dungeon Visualizer");
 
 		HBox mainBox = new HBox();
@@ -123,13 +125,16 @@ public class DungeonVisualizer extends Application {
 		// clear any children
 		mapBox.getChildren().clear();
 
+		roomMap = new boolean[dungeonGenerator.getWidth()][dungeonGenerator.getHeight()];
+		corridorMap = new boolean[dungeonGenerator.getWidth()][dungeonGenerator.getHeight()];
+
 		// container for all the visual elements
 		Group group = new Group();
 
 		// get the center of the map
 		int midX = (dungeonGenerator.getWidth() * tileWidth) / 2;
 		int midY = (dungeonGenerator.getHeight() * tileHeight) / 2;
-		
+
 		// create background
 		Rectangle bg = new Rectangle(0, 0, dungeonGenerator.getWidth() * tileWidth, dungeonGenerator.getHeight() * tileHeight);
 		bg.setFill(Color.BLACK);
@@ -139,19 +144,23 @@ public class DungeonVisualizer extends Application {
 		if(showGrid) {
 			addGrid(group);
 		}
-		
+
 		// add spawn boundary
 		if (showSpawnBoundary) {
 			int spawnX = dungeonGenerator.getSpawnBoxWidth() * tileWidth;
 			int spawnY = dungeonGenerator.getSpawnBoxHeight() * tileHeight;
 			Rectangle spawnBoundary = new Rectangle(midX - (spawnX / 2), midY - (spawnY / 2), spawnX, spawnY);
-			
+
 			spawnBoundary.setFill(Color.YELLOW);
 			spawnBoundary.setOpacity(0.25);
 			spawnBoundary.setStroke(Color.DARKGOLDENROD);
 			group.getChildren().add(spawnBoundary);
 		}
-		
+
+		// build room map
+		buildRoomMap(roomMap, level.getRooms());
+		buildCorridorMap(corridorMap, level.getCorridors());
+
 		/*
 		 *  TODO change to for each room, get the x,y and reference the cellmap.
 		 *  the cellmap has to be properly filled first though
@@ -166,11 +175,16 @@ public class DungeonVisualizer extends Application {
 				for (int y = 0; y < room.getBox().getHeight(); y++) {
 					int absX = room.getOrigin().getX() + x ;
 					int absY = room.getOrigin().getY() + y ;
-					Rectangle tile = new Rectangle(startX + (absX * tileWidth), startY + (absY * tileHeight), tileWidth, tileHeight);
-					// ensure not out of bounds
-					if (absX < level.getCellMap().length && absY < level.getCellMap()[0].length
-							&& absX >=0 && absY >=0) {
 
+					// ensure not out of bounds
+					if (absX < roomMap.length && absY < roomMap[0].length
+							&& absX >=0 && absY >=0) {
+						// ensure that the cell flag is turned on
+						if (!roomMap[absX][absY]) {
+							continue;
+						}
+
+						Rectangle tile = new Rectangle(startX + (absX * tileWidth), startY + (absY * tileHeight), tileWidth, tileHeight);
 						// select the room color
 						Paint color = selectRoomColor(room);
 
@@ -216,14 +230,14 @@ public class DungeonVisualizer extends Application {
 
 		// add corridors
 		if (showCorridors) {
-			addCorridors(level, group);
+			addCorridors(level, group, roomMap, corridorMap);
 		}
-		
+
 		// add all the exits (rooms and corridors)
 		if (showExits) {
 			addExits(level, group);
 		}
-		
+
 		// add a center rectangle
 		if (showCenterPoint) {
 			Rectangle center = new Rectangle(midX-3, midY-3, 6, 6); // center size is fixed.
@@ -231,7 +245,7 @@ public class DungeonVisualizer extends Application {
 			center.setStroke(Color.WHITE);
 			group.getChildren().add(center);
 		}
-		
+
 		// add edges
 		if (showEdges) {
 			addEdges(level, group);
@@ -248,7 +262,7 @@ public class DungeonVisualizer extends Application {
 		}
 
 		// TEMP add chunk outlines (for Minecraft visuals)
-		
+
 		mapBox.getChildren().add(group);
 	}
 
@@ -260,18 +274,18 @@ public class DungeonVisualizer extends Application {
 				text.setFont(new Font(10));
 				text.setFill(Color.ANTIQUEWHITE);
 				group.getChildren().add(text);
-				
+
 				// add main lines
 				Line line = new Line(startX + (gridX * tileWidth), startY, startX + (gridX * tileWidth), startY + (dungeonGenerator.getHeight() * tileHeight));
 				line.setStroke(Color.BLANCHEDALMOND);
 				line.setStrokeWidth(2.0);
-				line.setOpacity(0.35);
+				line.setOpacity(0.20);
 				group.getChildren().add(line);
 			}
 			else {
 				Line line = new Line(startX + (gridX * tileWidth), startY, startX + (gridX * tileWidth), startY + (dungeonGenerator.getHeight() * tileHeight));
 				line.setStroke(Color.BLANCHEDALMOND);
-				line.setOpacity(0.25);
+				line.setOpacity(0.10);
 				group.getChildren().add(line);
 			}
 		}
@@ -314,7 +328,7 @@ public class DungeonVisualizer extends Application {
 				});
 			}
 		});
-		
+
 		level.getCorridors().forEach(corridor -> {
 			if (!corridor.getExits().isEmpty()) {
 				corridor.getExits().forEach(exit -> {
@@ -332,13 +346,14 @@ public class DungeonVisualizer extends Application {
 	 * @param level
 	 * @param group
 	 */
-	private void addCorridors(DungeonLevel level, Group group) {
+	private void addCorridors(DungeonLevel level, Group group, boolean[][] roomMap, boolean[][] corridorMap) {
 		level.getCorridors().forEach(corridor -> {
 			for (int x = 0; x < corridor.getBox().getWidth(); x++) {
 				for (int y = 0; y < corridor.getBox().getHeight(); y++) {
 					int absX = corridor.getBox().getOrigin().getX() + x ;
 					int absY = corridor.getBox().getOrigin().getY() + y ;
-					Rectangle tile = new Rectangle(startX + (absX * tileWidth), startY + (absY * tileHeight), tileWidth, tileHeight);
+					if (corridorMap[absX][absY] && !roomMap[absX][absY]) {
+						Rectangle tile = new Rectangle(startX + (absX * tileWidth), startY + (absY * tileHeight), tileWidth, tileHeight);
 
 						// select the room color
 						Paint color = Color.YELLOW;
@@ -347,20 +362,23 @@ public class DungeonVisualizer extends Application {
 						tile.setStrokeWidth(0.5);
 						tile.setFill(color);
 						if (x == 0 || y == 0 || x == corridor.getBox().getWidth()-1 || y == corridor.getBox().getHeight()-1) {
+//							tile.setStrokeWidth(1);
 							tile.setFill(ROOM_FLOOR_COLOR);
-							tile.setStroke(Color.DARKOLIVEGREEN);
+							tile.setStroke(Color.LIGHTBLUE);
+//							tile.setFill(Color.BEIGE);
 						}
 						else {
 							tile.setStroke(Color.BLACK);
 						}
-						group.getChildren().add(tile);					
+						group.getChildren().add(tile);			
+					}
 				}
 			}	
-			
-			addCorridorOutline(corridor, group);
+
+//			addCorridorOutline(corridor, group);
 		});	
 	}
-	
+
 	/**
 	 * 
 	 * @param corridor
@@ -453,17 +471,17 @@ public class DungeonVisualizer extends Application {
 				Coords2D connector1 = wayline.getConnector1().getCoords();
 				Coords2D connector2 = wayline.getConnector2().getCoords();
 				Axis axis = connector1.getX() == connector2.getX() ? Axis.Y : Axis.X;
-					
+
 				Line line;
 				if (axis == Axis.X) {
 					Coords2D c = connector1.getX() <= connector2.getX() ? connector1 : connector2;
 					line = new Line(c.getX() * tileWidth, c.getY() * tileHeight,
-						(c.getX() + wayline.getBox().getWidth()-1) * tileWidth, c.getY() * tileHeight);
+							(c.getX() + wayline.getBox().getWidth()-1) * tileWidth, c.getY() * tileHeight);
 				}
 				else {
 					Coords2D c = connector1.getY() <= connector2.getY() ? connector1 : connector2;
 					line = new Line(c.getX() * tileWidth, c.getY() * tileHeight,
-						c.getX() * tileWidth, (c.getY() + wayline.getBox().getHeight()-1) * tileHeight);
+							c.getX() * tileWidth, (c.getY() + wayline.getBox().getHeight()-1) * tileHeight);
 				}
 				line.setStroke(Color.DEEPPINK);
 				line.setStrokeWidth(1.25);
@@ -522,7 +540,7 @@ public class DungeonVisualizer extends Application {
 		labels.add(heightLabel);
 		fields.add(heightField);
 		hBoxes.add(heightBox);
-		
+
 		// spawn box dimensions
 		Label spawnBoundaryWidthLabel = new Label("Width:");
 		TextField spawnBoundaryWidthField = new TextField("30");
@@ -590,17 +608,17 @@ public class DungeonVisualizer extends Application {
 		HBox showGridBox = addToggle("Show Grid:", showGrid, labels, hBoxes, (visualizer, bool) -> {
 			visualizer.setShowGrid(bool);
 		});
-		
+
 		// show center point
 		HBox showCenterPointBox = addToggle("Show Center Point:", showCenterPoint, labels, hBoxes, (visualizer, bool) -> {
 			visualizer.setShowCenterPoint(bool);
 		});
-		
+
 		// show spawn boundary
 		HBox showSpawnBoundaryBox = addToggle("Show Spawn Boundary:", showSpawnBoundary, labels, hBoxes, (visualizer, bool) -> {
 			visualizer.setShowSpawnBoundary(bool);
 		});
-		
+
 		// show non-rooms
 		HBox showNonRoomsBox = addToggle("Show Non-Selected Rooms:", showNonRooms, labels, hBoxes, (visualizer, bool) -> {
 			visualizer.setShowNonRooms(bool);
@@ -620,12 +638,12 @@ public class DungeonVisualizer extends Application {
 		HBox showWaylinesBox = addToggle("Show Waylines:", showWaylines, labels, hBoxes, (visualizer, bool) -> {
 			visualizer.setShowWaylines(bool);
 		});
-		
+
 		// show corridors
 		HBox showCorridorsBox = addToggle("Show Corridors:", showCorridors, labels, hBoxes, (visualizer, bool) -> {
 			visualizer.setShowCorridors(bool);
 		});
-		
+
 		// show exits
 		HBox showExitsBox = addToggle("Show Exits:", showExits, labels, hBoxes, (visualizer, bool) -> {
 			visualizer.setShowExits(bool);
@@ -690,7 +708,7 @@ public class DungeonVisualizer extends Application {
 				System.out.println("hasIntersections=" + hasIntersections);
 				if (hasIntersections) {    	    		
 					hasIntersections = dungeonGenerator.iterateSeparationStep(center, level.getRooms(), dungeonGenerator.getMovementFactor());
-					dungeonGenerator.updateCellMap(level.getCellMap(), level.getRooms());
+					dungeonGenerator.updateCellMap(level.getCellMap(), level.getRooms(), null);
 				}
 				buildMapPane(mapBox, level);
 			}
@@ -771,6 +789,41 @@ public class DungeonVisualizer extends Application {
 		hBoxes.add(hBox);
 		return hBox;
 	}
+
+	public boolean[][] buildRoomMap(boolean cellMap[][], List<IRoom> rooms) {
+		rooms.forEach(room -> {
+			if (!showNonRooms && room.getRole() != RoomRole.MAIN && room.getRole() != RoomRole.AUXILIARY) {
+				return;
+			}
+			for (int w = 0; w < room.getBox().getWidth(); w++) {
+				for (int d = 0; d < room.getBox().getHeight(); d++) {
+					int x = room.getOrigin().getX() + w;
+					int y = room.getOrigin().getY() + d;
+					// don't mark the walls are true since corridors can run thru the walls and need to show up
+					if ( x > 0 && y > 0 && x < cellMap.length -1 && y < cellMap[0].length - 1) {
+						cellMap[room.getOrigin().getX() + w][room.getOrigin().getY() + d] = true;
+					}
+				}
+			}
+		});
+		return cellMap;
+	}
+
+	public boolean[][] buildCorridorMap(boolean cellMap[][], List<Corridor> corridors) {
+		corridors.forEach(corridor -> {
+			for (int w = 0; w < corridor.getBox().getWidth(); w++) {
+				for (int d = 0; d < corridor.getBox().getHeight(); d++) {
+					int x = corridor.getBox().getOrigin().getX() + w;
+					int y = corridor.getBox().getOrigin().getY() + d;
+					if ( x >= 0 && y >= 0 && x < cellMap.length && y < cellMap[0].length) {
+						cellMap[corridor.getBox().getOrigin().getX() + w][corridor.getBox().getOrigin().getY() + d] = true;
+					}
+				}
+			}
+		});
+		return cellMap;
+	}
+
 
 	public class Counter {
 		int index = 0;
