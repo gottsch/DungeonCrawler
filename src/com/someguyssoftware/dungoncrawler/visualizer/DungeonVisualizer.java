@@ -7,15 +7,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.function.BiConsumer;
-import java.util.function.Supplier;
 
+import javafx.scene.layout.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.someguyssoftware.dungoncrawler.generator.Axis;
 import com.someguyssoftware.dungoncrawler.generator.Coords2D;
 import com.someguyssoftware.dungoncrawler.generator.INode;
-import com.someguyssoftware.dungoncrawler.generator.NodeType;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.Corridor;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.DungeonLevel;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.DungeonLevelGenerator;
@@ -37,8 +36,6 @@ import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleGroup;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.Line;
@@ -86,6 +83,12 @@ public class DungeonVisualizer extends Application {
 
 	private boolean[][] roomMap;
 	private boolean[][] corridorMap;
+
+	// ui controls
+	HBox gridBox;
+	AnchorPane spawnBoundary;
+	AnchorPane centerPoint;
+
 	/**
 	 * @param args
 	 */
@@ -103,18 +106,124 @@ public class DungeonVisualizer extends Application {
 		stage.setHeight(1020);
 		stage.setTitle("Dungeon Visualizer");
 
+        // create a background
+//        BackgroundFill background_fill = new BackgroundFill(Color.PINK,
+//                CornerRadii.EMPTY, Insets.EMPTY);
+//        Background background = new Background(background_fill);
+        
 		HBox mainBox = new HBox();
-		HBox mapBox = new HBox();
 		VBox inputBox = new VBox();
+		HBox mapBaseBox = new HBox();
+		StackPane mapStack = new StackPane();
 
-		buildInputPane(inputBox, mapBox);
-		mainBox.getChildren().addAll(inputBox, mapBox);
+		HBox bgBox = new HBox();
+		gridBox = new HBox();
+		spawnBoundary = new AnchorPane();
+		centerPoint = new AnchorPane();
+		HBox mapBox = new HBox();
+
+		// TODO changing the width and the height needs to reset all these values: bg, grid, spawn boundary, center
+
+		// build the input box
+		buildInputsInterface(inputBox, mapBox);
+
+		// build the bg box
+		buildBackgroundInterface(bgBox);
+
+		// build the grid box
+		buildGridInterface(gridBox);
+
+		// build the spawn boundary
+		buildSpawnBoundaryInterface(spawnBoundary);
+
+		// build the center point
+		buildCenterPointInterface(centerPoint);
+
+		mapStack.getChildren().addAll(bgBox, gridBox, spawnBoundary, centerPoint, mapBox);
+		mapBaseBox.getChildren().add(mapStack);
+
+		// assemble the main box
+		mainBox.getChildren().addAll(inputBox, mapBaseBox);
 
 		Scene scene = new Scene(mainBox);
 		stage.setScene(scene);
 
 		// display the application
 		stage.show();
+	}
+
+	/**
+	 *
+	 * @param centerPointPane
+	 */
+	private void buildCenterPointInterface(AnchorPane centerPointPane) {
+		// get the center of the map
+		int midX = (dungeonGenerator.getWidth() * tileWidth) / 2;
+		int midY = (dungeonGenerator.getHeight() * tileHeight) / 2;
+
+		int spawnX = dungeonGenerator.getSpawnBoxWidth() * tileWidth;
+		int spawnY = dungeonGenerator.getSpawnBoxHeight() * tileHeight;
+
+		// add a center rectangle
+		Rectangle center = new Rectangle(6, 6); // center size is fixed.
+		center.setFill(Color.RED);
+		center.setStroke(Color.WHITE);
+
+		centerPointPane.setMinWidth(dungeonGenerator.getWidth() * tileWidth);
+		centerPointPane.setMinHeight(dungeonGenerator.getHeight() * tileHeight);
+		centerPointPane.getChildren().add(center);
+		centerPointPane.setVisible(isShowCenterPoint());
+		AnchorPane.setTopAnchor(center, (double)midX-3);
+		AnchorPane.setLeftAnchor(center, (double)midY-3);
+	}
+
+	/**
+	 *
+	 * @param spawnBoundaryPane
+	 */
+	private void buildSpawnBoundaryInterface(AnchorPane spawnBoundaryPane) {
+		// get the center of the map
+		int midX = (dungeonGenerator.getWidth() * tileWidth) / 2;
+		int midY = (dungeonGenerator.getHeight() * tileHeight) / 2;
+
+		int spawnX = dungeonGenerator.getSpawnBoxWidth() * tileWidth;
+		int spawnY = dungeonGenerator.getSpawnBoxHeight() * tileHeight;
+		Rectangle spawnBoundary = new Rectangle(spawnX, spawnY);
+
+		spawnBoundary.setFill(Color.YELLOW);
+		spawnBoundary.setOpacity(0.25);
+		spawnBoundary.setStroke(Color.DARKGOLDENROD);
+
+		spawnBoundaryPane.setMinWidth(dungeonGenerator.getWidth() * tileWidth);
+		spawnBoundaryPane.setMinHeight(dungeonGenerator.getHeight() * tileHeight);
+		spawnBoundaryPane.getChildren().add(spawnBoundary);
+		spawnBoundaryPane.setVisible(isShowSpawnBoundary());
+		AnchorPane.setTopAnchor(spawnBoundary, (double)midX - (spawnX / 2));
+		AnchorPane.setLeftAnchor(spawnBoundary, (double)midY - (spawnY / 2));
+	}
+
+	/**
+	 *
+	 * @param bgBox
+	 */
+	private void buildBackgroundInterface(HBox bgBox) {
+		// create background
+		Rectangle bg = new Rectangle(0, 0, dungeonGenerator.getWidth() * tileWidth, dungeonGenerator.getHeight() * tileHeight);
+		bg.setFill(Color.BLACK);
+		bgBox.getChildren().add(bg);
+	}
+
+	/**
+	 *
+	 * @param gridBox
+	 */
+	private void buildGridInterface(HBox gridBox) {
+		// container for all the visual elements
+		Group group = new Group();
+		// add grid legends
+		addGrid(group);
+		gridBox.setVisible(isShowGrid());
+		gridBox.getChildren().addAll(group);
 	}
 
 	/**
@@ -135,27 +244,27 @@ public class DungeonVisualizer extends Application {
 		int midX = (dungeonGenerator.getWidth() * tileWidth) / 2;
 		int midY = (dungeonGenerator.getHeight() * tileHeight) / 2;
 
-		// create background
+		// create background space filler (needed to make the group the right size
 		Rectangle bg = new Rectangle(0, 0, dungeonGenerator.getWidth() * tileWidth, dungeonGenerator.getHeight() * tileHeight);
-		bg.setFill(Color.BLACK);
+		bg.setFill(Color.TRANSPARENT);
 		group.getChildren().add(bg);
-
-		// add grid legends
-		if(showGrid) {
-			addGrid(group);
-		}
+//
+//		// add grid legends
+//		if(showGrid) {
+//			addGrid(group);
+//		}
 
 		// add spawn boundary
-		if (showSpawnBoundary) {
-			int spawnX = dungeonGenerator.getSpawnBoxWidth() * tileWidth;
-			int spawnY = dungeonGenerator.getSpawnBoxHeight() * tileHeight;
-			Rectangle spawnBoundary = new Rectangle(midX - (spawnX / 2), midY - (spawnY / 2), spawnX, spawnY);
-
-			spawnBoundary.setFill(Color.YELLOW);
-			spawnBoundary.setOpacity(0.25);
-			spawnBoundary.setStroke(Color.DARKGOLDENROD);
-			group.getChildren().add(spawnBoundary);
-		}
+//		if (showSpawnBoundary) {
+//			int spawnX = dungeonGenerator.getSpawnBoxWidth() * tileWidth;
+//			int spawnY = dungeonGenerator.getSpawnBoxHeight() * tileHeight;
+//			Rectangle spawnBoundary = new Rectangle(midX - (spawnX / 2), midY - (spawnY / 2), spawnX, spawnY);
+//
+//			spawnBoundary.setFill(Color.YELLOW);
+//			spawnBoundary.setOpacity(0.25);
+//			spawnBoundary.setStroke(Color.DARKGOLDENROD);
+//			group.getChildren().add(spawnBoundary);
+//		}
 
 		// build room map
 		buildRoomMap(roomMap, level.getRooms());
@@ -238,13 +347,13 @@ public class DungeonVisualizer extends Application {
 			addExits(level, group);
 		}
 
-		// add a center rectangle
-		if (showCenterPoint) {
-			Rectangle center = new Rectangle(midX-3, midY-3, 6, 6); // center size is fixed.
-			center.setFill(Color.RED);
-			center.setStroke(Color.WHITE);
-			group.getChildren().add(center);
-		}
+//		// add a center rectangle
+//		if (showCenterPoint) {
+//			Rectangle center = new Rectangle(midX-3, midY-3, 6, 6); // center size is fixed.
+//			center.setFill(Color.RED);
+//			center.setStroke(Color.WHITE);
+//			group.getChildren().add(center);
+//		}
 
 		// add edges
 		if (showEdges) {
@@ -495,7 +604,7 @@ public class DungeonVisualizer extends Application {
 
 	/**
 	 * 
-	 * @param level2
+	 * @param level
 	 * @param group
 	 */
 	private void addPaths(DungeonLevel level, Group group) {
@@ -519,7 +628,7 @@ public class DungeonVisualizer extends Application {
 	 * 
 	 * @param pane
 	 */
-	public void buildInputPane(VBox pane, HBox mapBox) {
+	public void buildInputsInterface(VBox pane, HBox mapBox) {
 		pane.setPadding(new Insets(5, 5, 5, 5));
 
 		List<Label> labels = new ArrayList<>();
@@ -605,17 +714,17 @@ public class DungeonVisualizer extends Application {
 		hBoxes.add(pathFactorBox);
 
 		// show grid
-		HBox showGridBox = addToggle("Show Grid:", showGrid, labels, hBoxes, (visualizer, bool) -> {
+		HBox showGridBox = addVisibleToggle("Show Grid:", showGrid, labels, hBoxes, gridBox, (visualizer, bool) -> {
 			visualizer.setShowGrid(bool);
 		});
 
 		// show center point
-		HBox showCenterPointBox = addToggle("Show Center Point:", showCenterPoint, labels, hBoxes, (visualizer, bool) -> {
+		HBox showCenterPointBox = addVisibleToggle("Show Center Point:", showCenterPoint, labels, hBoxes, centerPoint, (visualizer, bool) -> {
 			visualizer.setShowCenterPoint(bool);
 		});
 
 		// show spawn boundary
-		HBox showSpawnBoundaryBox = addToggle("Show Spawn Boundary:", showSpawnBoundary, labels, hBoxes, (visualizer, bool) -> {
+		HBox showSpawnBoundaryBox = addVisibleToggle("Show Spawn Boundary:", showSpawnBoundary, labels, hBoxes, spawnBoundary, (visualizer, bool) -> {
 			visualizer.setShowSpawnBoundary(bool);
 		});
 
@@ -661,9 +770,9 @@ public class DungeonVisualizer extends Application {
 			@Override public void handle(ActionEvent e) {
 
 				level = (DungeonLevel) dungeonGenerator
-						.withSpawnBoxWidth(new Integer(spawnBoundaryWidthField.getText()))
-						.withSpawnBoxHeight(new Integer(spawnBoundaryHeightField.getText()))
-						.withNumberOfRooms(new Integer(numRoomsField.getText()))
+						.withSpawnBoxWidth(Integer.valueOf(spawnBoundaryWidthField.getText()))
+						.withSpawnBoxHeight(Integer.valueOf(spawnBoundaryHeightField.getText()))
+						.withNumberOfRooms(Integer.valueOf(numRoomsField.getText()))
 						.withMinRoomSize(Math.max(5, new Integer(minRoomSizeField.getText())))
 						.withMaxRoomSize(Math.max(5, new Integer(maxRoomSizeField.getText())))
 						.withMovementFactor(new Integer(movementFactorField.getText()))
@@ -784,6 +893,41 @@ public class DungeonVisualizer extends Application {
 				}
 			}
 		});		
+		HBox hBox = new HBox(label, onButton, offButton);
+		labels.add(label);
+		hBoxes.add(hBox);
+		return hBox;
+	}
+
+	private HBox addVisibleToggle(String labelText, boolean defaultValue, List<Label>labels, List<HBox> hBoxes, Pane pane, BiConsumer<DungeonVisualizer, Boolean> setter) {
+		ToggleGroup group = new ToggleGroup();
+		Label label = new Label(labelText);
+		RadioButton onButton = new RadioButton();
+		RadioButton offButton = new RadioButton();
+		onButton.setText("On");
+		offButton.setText("Off");
+		onButton.setToggleGroup(group);
+		offButton.setToggleGroup(group);
+		if (defaultValue == true) {
+			onButton.setSelected(true);
+		}
+		else {
+			offButton.setSelected(true);
+		}
+
+		group.selectedToggleProperty().addListener(new ChangeListener<Toggle> () {
+			public void changed(ObservableValue<? extends Toggle> ov, Toggle oldToggle, Toggle newToggle) {
+				RadioButton rb = (RadioButton)group.getSelectedToggle();
+				if (rb.getText().equals("On")) {
+					setter.accept(DungeonVisualizer.this, true);
+					pane.setVisible(true);
+				}
+				else {
+					setter.accept(DungeonVisualizer.this, false);
+					pane.setVisible(false);
+				}
+			}
+		});
 		HBox hBox = new HBox(label, onButton, offButton);
 		labels.add(label);
 		hBoxes.add(hBox);
