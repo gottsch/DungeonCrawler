@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.function.BiConsumer;
 
+import com.sun.javafx.scene.control.IntegerField;
 import javafx.scene.layout.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -85,9 +86,10 @@ public class DungeonVisualizer extends Application {
 	private boolean[][] corridorMap;
 
 	// ui controls
-	HBox gridBox;
-	AnchorPane spawnBoundary;
-	AnchorPane centerPoint;
+	private HBox bgBox;
+	private HBox gridBox;
+	private AnchorPane spawnBoundary;
+	private AnchorPane centerPoint;
 
 	/**
 	 * @param args
@@ -116,16 +118,22 @@ public class DungeonVisualizer extends Application {
 		HBox mapBaseBox = new HBox();
 		StackPane mapStack = new StackPane();
 
-		HBox bgBox = new HBox();
+		bgBox = new HBox();
 		gridBox = new HBox();
 		spawnBoundary = new AnchorPane();
 		centerPoint = new AnchorPane();
 		HBox mapBox = new HBox();
 
+		VisualContext context = new VisualContext();
+		context.setBgBox(bgBox);
+		context.setGridBox(gridBox);
+		context.setSpawnBoundary(spawnBoundary);
+		context.setCenterPoint(centerPoint);
+
 		// TODO changing the width and the height needs to reset all these values: bg, grid, spawn boundary, center
 
 		// build the input box
-		buildInputsInterface(inputBox, mapBox);
+		buildInputsInterface(inputBox, mapBox, context);
 
 		// build the bg box
 		buildBackgroundInterface(bgBox);
@@ -628,7 +636,7 @@ public class DungeonVisualizer extends Application {
 	 * 
 	 * @param pane
 	 */
-	public void buildInputsInterface(VBox pane, HBox mapBox) {
+	public void buildInputsInterface(VBox pane, HBox mapBox, VisualContext context) {
 		pane.setPadding(new Insets(5, 5, 5, 5));
 
 		List<Label> labels = new ArrayList<>();
@@ -714,17 +722,17 @@ public class DungeonVisualizer extends Application {
 		hBoxes.add(pathFactorBox);
 
 		// show grid
-		HBox showGridBox = addVisibleToggle("Show Grid:", showGrid, labels, hBoxes, gridBox, (visualizer, bool) -> {
+		HBox showGridBox = addVisibleToggle("Show Grid:", showGrid, labels, hBoxes, context.getGridBox(), (visualizer, bool) -> {
 			visualizer.setShowGrid(bool);
 		});
 
 		// show center point
-		HBox showCenterPointBox = addVisibleToggle("Show Center Point:", showCenterPoint, labels, hBoxes, centerPoint, (visualizer, bool) -> {
+		HBox showCenterPointBox = addVisibleToggle("Show Center Point:", showCenterPoint, labels, hBoxes, context.getCenterPoint(), (visualizer, bool) -> {
 			visualizer.setShowCenterPoint(bool);
 		});
 
 		// show spawn boundary
-		HBox showSpawnBoundaryBox = addVisibleToggle("Show Spawn Boundary:", showSpawnBoundary, labels, hBoxes, spawnBoundary, (visualizer, bool) -> {
+		HBox showSpawnBoundaryBox = addVisibleToggle("Show Spawn Boundary:", showSpawnBoundary, labels, hBoxes, context.getSpawnBoundary(), (visualizer, bool) -> {
 			visualizer.setShowSpawnBoundary(bool);
 		});
 
@@ -829,6 +837,31 @@ public class DungeonVisualizer extends Application {
 		buttonsBox2.getChildren().addAll(initButton, iterationButton);
 		hBoxes.add(buttonsBox2);
 
+		// navigating levels controls (special, excluded from general formatting)
+		Label levelNavigatorLabel = new Label("Level:");
+		TextField levelNavigatorField = new TextField("1");
+		levelNavigatorField.setEditable(false);
+		Button prevLevelButton = new Button("<");
+		Button nextLevelButton = new Button(">");
+		HBox navBox = new HBox(levelNavigatorLabel, levelNavigatorField, prevLevelButton, nextLevelButton);
+		prevLevelButton.setOnAction(new EventHandler<ActionEvent>() {
+			@Override public void handle(ActionEvent e) {
+				if (Integer.parseInt(levelNavigatorField.getText()) > 1)
+				levelNavigatorField.setText(String.valueOf(Integer.parseInt(levelNavigatorField.getText()) - 1));
+				// TODO show/hide the level
+			}
+		});
+		nextLevelButton.setOnAction(new EventHandler<ActionEvent>() {
+			@Override public void handle(ActionEvent e) {
+				levelNavigatorField.setText(String.valueOf(Integer.parseInt(levelNavigatorField.getText()) + 1));
+				// TODO show/hide the level
+			}
+		});
+		
+		labels.add(levelNavigatorLabel);
+		fields.add(levelNavigatorField);
+		hBoxes.add(navBox);
+
 		// formatting for the labels
 		for (Label label : labels) {
 			label.setMinWidth(120);
@@ -855,8 +888,9 @@ public class DungeonVisualizer extends Application {
 				movementFactorBox, meanFactorBox, pathFactorBox, 
 				showGridBox, showCenterPointBox, showSpawnBoundaryBox, showNonRoomsBox, showEdgesBox, showPathsBox,
 				showWaylinesBox, showCorridorsBox, showExitsBox,
-				buttonsBox, buttonsBox2);
+				buttonsBox, buttonsBox2, navBox);
 	}
+
 
 	/**
 	 * 

@@ -1,6 +1,3 @@
-/**
- * 
- */
 package com.someguyssoftware.dungoncrawler.generator.dungeon;
 
 import java.util.ArrayList;
@@ -562,6 +559,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 			Coords2D coords2 = wayline.getConnector2().getCoords();
 //			LOGGER.debug("exit: using coords1 -> {}, coords2 -> {}", coords1, coords2);
 			Axis axis = (coords1.getX() == coords2.getX()) ? Axis.Y : Axis.X;
+			// TODO exclude any exits that aren't on room edges
 			switch (axis) {
 			case X:
 				if (coords1.getX() < room.getMinX() || coords2.getX() < room.getMinX()) {
@@ -618,7 +616,6 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * 
 	 * @param room
 	 * @param wayline
-	 * @param nodes
 	 * @return
 	 */
 	private boolean intersects(IRoom room, Wayline wayline) {
@@ -639,7 +636,6 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param rand
 	 * @param paths
 	 * @param rooms
-	 * @param factory
 	 * @return
 	 */
 	public List<Wayline> getWaylines(Random rand, List<Edge> paths, List<IRoom> rooms) {
@@ -947,8 +943,6 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * 
 	 * @param node1
 	 * @param node2
-	 * @param nodes
-	 * @param factory
 	 * @return
 	 */
 	public Wayline getHorizontalWayline(final INode node1, final INode node2) {
@@ -977,8 +971,6 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * 
 	 * @param node1
 	 * @param node2
-	 * @param nodes
-	 * @param factory
 	 * @return
 	 */
 	public Wayline getVerticalWayline(final INode node1, final INode node2) {
@@ -1159,7 +1151,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 
 		IRoom startRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
 		// TEST
-		startRoom.setOrigin(new Coords2D(80, 20));
+//		startRoom.setOrigin(new Coords2D(80, 20));
 		startRoom.setRole(RoomRole.MAIN).setType(NodeType.START).setMaxDegrees(5).setId(0);
 		startRoom.getFlags().add(RoomFlag.NO_INTERSECTION);
 		rooms.add(startRoom);
@@ -1202,7 +1194,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		// have to have at least one end room
 		IRoom endRoom = generateRoom(random, centerPoint, spawnBoundingBox, minRoomSize, maxRoomSize);
 		// TEST
-		endRoom.setOrigin(new Coords2D(20, 80));
+//		endRoom.setOrigin(new Coords2D(20, 80));
 		endRoom.setRole(RoomRole.MAIN).setType(NodeType.END).setMaxDegrees(1).setId(rooms.size());
 		endRoom.getFlags().add(RoomFlag.NO_INTERSECTION);
 		rooms.add(endRoom);
@@ -1256,8 +1248,8 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param random
 	 * @param centerPoint
 	 * @param boundingBox
-	 * @param minRoomSize2
-	 * @param maxRoomSize2
+	 * @param minRoomSize
+	 * @param maxRoomSize
 	 * @return
 	 */
 	private IRoom generateRoom(Random random, Coords2D centerPoint, Rectangle2D boundingBox, int minRoomSize,
