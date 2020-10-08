@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.function.BiConsumer;
 
-import com.sun.javafx.scene.control.IntegerField;
 import javafx.scene.layout.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -256,23 +255,6 @@ public class DungeonVisualizer extends Application {
 		Rectangle bg = new Rectangle(0, 0, dungeonGenerator.getWidth() * tileWidth, dungeonGenerator.getHeight() * tileHeight);
 		bg.setFill(Color.TRANSPARENT);
 		group.getChildren().add(bg);
-//
-//		// add grid legends
-//		if(showGrid) {
-//			addGrid(group);
-//		}
-
-		// add spawn boundary
-//		if (showSpawnBoundary) {
-//			int spawnX = dungeonGenerator.getSpawnBoxWidth() * tileWidth;
-//			int spawnY = dungeonGenerator.getSpawnBoxHeight() * tileHeight;
-//			Rectangle spawnBoundary = new Rectangle(midX - (spawnX / 2), midY - (spawnY / 2), spawnX, spawnY);
-//
-//			spawnBoundary.setFill(Color.YELLOW);
-//			spawnBoundary.setOpacity(0.25);
-//			spawnBoundary.setStroke(Color.DARKGOLDENROD);
-//			group.getChildren().add(spawnBoundary);
-//		}
 
 		// build room map
 		buildRoomMap(roomMap, level.getRooms());
@@ -354,14 +336,6 @@ public class DungeonVisualizer extends Application {
 		if (showExits) {
 			addExits(level, group);
 		}
-
-//		// add a center rectangle
-//		if (showCenterPoint) {
-//			Rectangle center = new Rectangle(midX-3, midY-3, 6, 6); // center size is fixed.
-//			center.setFill(Color.RED);
-//			center.setStroke(Color.WHITE);
-//			group.getChildren().add(center);
-//		}
 
 		// add edges
 		if (showEdges) {
@@ -673,6 +647,14 @@ public class DungeonVisualizer extends Application {
 		fields.add(spawnBoundaryHeightField);
 		hBoxes.add(spawnBoundaryHeightBox);
 
+        // number of levels
+        Label numLevelsLabel = new Label("# of Levels");
+        TextField numLevelsField = new TextField("1");
+        HBox numLevelsBox = new HBox(numLevelsLabel, numLevelsField);
+        labels.add(numLevelsLabel);
+        fields.add(numLevelsField);
+        hBoxes.add(numLevelsBox);
+
 		// number of rooms
 		Label numRoomsLabel = new Label("# of Rooms:");
 		TextField numRoomsField = new TextField("15");
@@ -781,13 +763,13 @@ public class DungeonVisualizer extends Application {
 						.withSpawnBoxWidth(Integer.valueOf(spawnBoundaryWidthField.getText()))
 						.withSpawnBoxHeight(Integer.valueOf(spawnBoundaryHeightField.getText()))
 						.withNumberOfRooms(Integer.valueOf(numRoomsField.getText()))
-						.withMinRoomSize(Math.max(5, new Integer(minRoomSizeField.getText())))
-						.withMaxRoomSize(Math.max(5, new Integer(maxRoomSizeField.getText())))
-						.withMovementFactor(new Integer(movementFactorField.getText()))
-						.withMeanFactor(new Double(meanFactorField.getText()))
-						.withPathFactor(new Double(pathFactorField.getText()))
-						.withHeight(new Integer(widthField.getText()))
-						.withWidth(new Integer(heightField.getText()))    	    			
+						.withMinRoomSize(Math.max(5, Integer.valueOf(minRoomSizeField.getText())))
+						.withMaxRoomSize(Math.max(5, Integer.valueOf(maxRoomSizeField.getText())))
+						.withMovementFactor(Integer.valueOf(movementFactorField.getText()))
+						.withMeanFactor(Double.valueOf(meanFactorField.getText()))
+						.withPathFactor(Double.valueOf(pathFactorField.getText()))
+						.withHeight(Integer.valueOf(widthField.getText()))
+						.withWidth(Integer.valueOf(heightField.getText()))
 						.build();
 
 				buildMapPane(mapBox, level);
@@ -800,16 +782,16 @@ public class DungeonVisualizer extends Application {
 		initButton.setOnAction(new EventHandler<ActionEvent>() {
 			@Override public void handle(ActionEvent e) {
 				level = (DungeonLevel) dungeonGenerator
-						.withSpawnBoxWidth(new Integer(spawnBoundaryWidthField.getText()))
-						.withSpawnBoxHeight(new Integer(spawnBoundaryHeightField.getText()))
-						.withNumberOfRooms(new Integer(numRoomsField.getText()))
-						.withMinRoomSize(Math.max(5, new Integer(minRoomSizeField.getText())))
-						.withMaxRoomSize(Math.max(5, new Integer(maxRoomSizeField.getText())))
-						.withMovementFactor(new Integer(movementFactorField.getText()))
-						.withMeanFactor(new Double(meanFactorField.getText()))
-						.withPathFactor(new Double(pathFactorField.getText()))
-						.withHeight(new Integer(widthField.getText()))
-						.withWidth(new Integer(heightField.getText()))
+						.withSpawnBoxWidth(Integer.valueOf(spawnBoundaryWidthField.getText()))
+						.withSpawnBoxHeight(Integer.valueOf(spawnBoundaryHeightField.getText()))
+						.withNumberOfRooms(Integer.valueOf(numRoomsField.getText()))
+						.withMinRoomSize(Math.max(5, Integer.valueOf(minRoomSizeField.getText())))
+						.withMaxRoomSize(Math.max(5, Integer.valueOf(maxRoomSizeField.getText())))
+						.withMovementFactor(Integer.valueOf(movementFactorField.getText()))
+						.withMeanFactor(Double.valueOf(meanFactorField.getText()))
+						.withPathFactor(Double.valueOf(pathFactorField.getText()))
+						.withHeight(Integer.valueOf(widthField.getText()))
+						.withWidth(Integer.valueOf(heightField.getText()))
 						.init();
 
 				hasIntersections = true;
@@ -884,7 +866,7 @@ public class DungeonVisualizer extends Application {
 		pane.getChildren().addAll(
 				widthBox, heightBox, 
 				spawnBoundaryWidthBox, spawnBoundaryHeightBox, 
-				numRoomsBox, minRoomSizeBox, maxRoomSizeBox, 
+				numLevelsBox, numRoomsBox, minRoomSizeBox, maxRoomSizeBox, 
 				movementFactorBox, meanFactorBox, pathFactorBox, 
 				showGridBox, showCenterPointBox, showSpawnBoundaryBox, showNonRoomsBox, showEdgesBox, showPathsBox,
 				showWaylinesBox, showCorridorsBox, showExitsBox,
