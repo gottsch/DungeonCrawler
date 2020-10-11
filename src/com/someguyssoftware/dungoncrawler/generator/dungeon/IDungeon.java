@@ -5,7 +5,7 @@ import java.util.Set;
 import com.someguyssoftware.dungoncrawler.generator.ILevel;
 
 /**
- * 
+ * @author Mark Gottschling on Oct 7, 2020
  */
 public interface IDungeon {
     public Set<ILevel> getLevels();
