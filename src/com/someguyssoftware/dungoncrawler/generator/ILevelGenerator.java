@@ -9,7 +9,7 @@ import java.util.Map;
 
 
 /**
- * @author Mark
+ * @author Mark Gottschling
  *
  */
 public interface ILevelGenerator {

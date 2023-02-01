@@ -10,5 +10,6 @@ package com.someguyssoftware.dungoncrawler.generator.dungeon;
 public enum RoomFlag {
 	ANCHOR,
 	SECRET,
-	NO_INTERSECTION;
+	NO_INTERSECTION, 
+	SEED;
 }

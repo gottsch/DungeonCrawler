@@ -125,6 +125,7 @@ public abstract class AbstractGraphLevelGenerator implements ILevelGenerator {
 			}
 			else if (node1.getType() == NodeType.START || node2.getType()  == NodeType.START) {
 				// skip if start joins the end
+				LOGGER.debug("skipping edge join from START to END.");
 			}
 			else if (!isEndEdgeMet) {
 				// add the edge
@@ -144,10 +145,18 @@ public abstract class AbstractGraphLevelGenerator implements ILevelGenerator {
 			}
 			else if (node1.getType() == NodeType.START || node2.getType() == NodeType.START) {
 				// skip
+				LOGGER.debug("skipping edge join from START to END.");
 			}
 			else if (!isEndEdgeMet) {
 				edges.add(edge);
-				isEndEdgeMet = true;
+//				isEndEdgeMet = true;
+				// increment the number of edges leading to the end room
+				endEdgeCount++;
+				// get the end room
+				INode end = node2.getType() == NodeType.END ? node2 : node3;
+				if (endEdgeCount >= end.getMaxDegrees()) {
+					isEndEdgeMet = true;
+				}
 			}
 			
 			edge = new Edge(node1.getId(), node3.getId(), matrix[node1.getId()][node3.getId()]);
@@ -156,10 +165,18 @@ public abstract class AbstractGraphLevelGenerator implements ILevelGenerator {
 			}
 			else if (node1.getType() == NodeType.START || node2.getType() == NodeType.START) {
 				// skip
+				LOGGER.debug("skipping edge join from START to END.");
 			}
 			else if (!isEndEdgeMet) {
 				edges.add(edge);
-				isEndEdgeMet = true;
+//				isEndEdgeMet = true;
+				// increment the number of edges leading to the end room
+				endEdgeCount++;
+				// get the end room
+				INode end = node1.getType() == NodeType.END ? node1 : node3;
+				if (endEdgeCount >= end.getMaxDegrees()) {
+					isEndEdgeMet = true;
+				}
 			}
 		}
 		return Optional.of(edges);

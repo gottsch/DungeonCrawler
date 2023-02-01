@@ -7,18 +7,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import javafx.scene.layout.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.util.Strings;
 
 import com.someguyssoftware.dungoncrawler.generator.Axis;
 import com.someguyssoftware.dungoncrawler.generator.Coords2D;
 import com.someguyssoftware.dungoncrawler.generator.INode;
+import com.someguyssoftware.dungoncrawler.generator.NodeType;
+import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.Corridor;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.DungeonLevel;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.DungeonLevelGenerator;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.IRoom;
+import com.someguyssoftware.dungoncrawler.generator.dungeon.Room;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.RoomFlag;
 import com.someguyssoftware.dungoncrawler.generator.dungeon.RoomRole;
 
@@ -84,6 +89,9 @@ public class DungeonVisualizer extends Application {
 	private boolean[][] roomMap;
 	private boolean[][] corridorMap;
 
+	private String startPositionLocked = "none";
+	private String endPositionLocked = "none";
+	
 	// ui controls
 	private HBox bgBox;
 	private HBox gridBox;
@@ -180,8 +188,8 @@ public class DungeonVisualizer extends Application {
 		centerPointPane.setMinHeight(dungeonGenerator.getHeight() * tileHeight);
 		centerPointPane.getChildren().add(center);
 		centerPointPane.setVisible(isShowCenterPoint());
-		AnchorPane.setTopAnchor(center, (double)midX-3);
-		AnchorPane.setLeftAnchor(center, (double)midY-3);
+		AnchorPane.setLeftAnchor(center, (double)midX-3);
+		AnchorPane.setTopAnchor(center, (double)midY-3);
 	}
 
 	/**
@@ -337,6 +345,9 @@ public class DungeonVisualizer extends Application {
 			addExits(level, group);
 		}
 
+		// add connectors
+		addConnectors(level, group);
+		
 		// add edges
 		if (showEdges) {
 			addEdges(level, group);
@@ -432,6 +443,25 @@ public class DungeonVisualizer extends Application {
 		});
 	}
 
+	private void addConnectors(DungeonLevel level, Group group) {
+		level.getRooms().forEach(room -> {
+			if (!room.getConnectors().isEmpty()) {
+				room.getConnectors().forEach((key, value) -> {
+					value.forEach(connector -> {
+						Rectangle tile = new Rectangle(startX + ((room.getMinX() + connector.getCoords().getX()) * tileWidth) - tileWidth, 
+								((room.getMinY() + connector.getCoords().getY()) * tileHeight) -tileHeight, tileWidth, tileHeight);
+						LOGGER.debug(
+								"room {} displaying connector @ {}, {}", room.getId(), ((room.getMinX() + connector.getCoords().getX())), 
+								((room.getMinY() + connector.getCoords().getY())));
+						tile.setStroke(Color.WHITE);
+						tile.setFill(Color.DARKMAGENTA);
+						group.getChildren().add(tile);
+					});
+				});
+			}			
+		});		
+	}
+	
 	/**
 	 * 
 	 * @param level
@@ -538,7 +568,13 @@ public class DungeonVisualizer extends Application {
 				color = END_ROOM_COLOR;
 				break;
 			default:
-				color = MAIN_ROOM_COLOR;
+				 // TEST
+				if (room.hasFlag(RoomFlag.NO_INTERSECTION)) {
+					color = Color.YELLOW;
+				}
+				else {
+					color = MAIN_ROOM_COLOR;
+				}
 			}
 		}
 		else if (room.getRole() == RoomRole.AUXILIARY) {
@@ -633,14 +669,14 @@ public class DungeonVisualizer extends Application {
 		hBoxes.add(heightBox);
 
 		// spawn box dimensions
-		Label spawnBoundaryWidthLabel = new Label("Width:");
+		Label spawnBoundaryWidthLabel = new Label("Spawn Width:");
 		TextField spawnBoundaryWidthField = new TextField("30");
 		HBox spawnBoundaryWidthBox = new HBox(spawnBoundaryWidthLabel, spawnBoundaryWidthField);
 		labels.add(spawnBoundaryWidthLabel);
 		fields.add(spawnBoundaryWidthField);
 		hBoxes.add(spawnBoundaryWidthBox);
 
-		Label spawnBoundaryHeightLabel = new Label("Height:");
+		Label spawnBoundaryHeightLabel = new Label("Spawn Height:");
 		TextField spawnBoundaryHeightField = new TextField("30");
 		HBox spawnBoundaryHeightBox = new HBox(spawnBoundaryHeightLabel, spawnBoundaryHeightField);
 		labels.add(spawnBoundaryHeightLabel);
@@ -655,6 +691,14 @@ public class DungeonVisualizer extends Application {
         fields.add(numLevelsField);
         hBoxes.add(numLevelsBox);
 
+		// number of seeds
+		Label numSeedsLabel = new Label("# of Seeds:");
+		TextField numSeedsField = new TextField("5");
+		HBox numSeedsBox = new HBox(numSeedsLabel, numSeedsField);
+		labels.add(numSeedsLabel);
+		fields.add(numSeedsField);
+		hBoxes.add(numSeedsBox);
+		
 		// number of rooms
 		Label numRoomsLabel = new Label("# of Rooms:");
 		TextField numRoomsField = new TextField("15");
@@ -679,6 +723,40 @@ public class DungeonVisualizer extends Application {
 		fields.add(maxRoomSizeField);
 		hBoxes.add(maxRoomSizeBox);
 
+		// room max degrees
+		Label maxRoomDegreesLabel = new Label("Max. room degrees:");
+		TextField maxRoomDegreesField = new TextField("5");
+		HBox maxRoomDegreesBox = new HBox(maxRoomDegreesLabel, maxRoomDegreesField);
+		labels.add(maxRoomDegreesLabel);
+		fields.add(maxRoomDegreesField);
+		hBoxes.add(maxRoomDegreesBox);
+		
+		// start room max degrees
+		Label maxStartRoomDegreesLabel = new Label("Max. start room degrees:");
+		TextField maxStartRoomDegreesField = new TextField("5");
+		HBox maxStartRoomDegreesBox = new HBox(maxStartRoomDegreesLabel, maxStartRoomDegreesField);
+		labels.add(maxStartRoomDegreesLabel);
+		fields.add(maxStartRoomDegreesField);
+		hBoxes.add(maxStartRoomDegreesBox);
+		
+		// end room max degrees
+		Label maxEndRoomDegreesLabel = new Label("Max. end room degrees:");
+		TextField maxEndRoomDegreesField = new TextField("1");
+		HBox maxEndRoomDegreesBox = new HBox(maxEndRoomDegreesLabel, maxEndRoomDegreesField);
+		labels.add(maxEndRoomDegreesLabel);
+		fields.add(maxEndRoomDegreesField);
+		hBoxes.add(maxEndRoomDegreesBox);
+		
+		// start room locked
+		HBox startLockedBox = addPositionLockToggle("Start position locked:", labels, hBoxes, (visualizer, value) -> {
+			visualizer.startPositionLocked = value;
+		});
+		
+		// end room locked
+		HBox endLockedBox = addPositionLockToggle("End position locked:", labels, hBoxes, (visualizer, value) -> {
+			visualizer.endPositionLocked = value;
+		});
+		
 		// movement factor
 		Label movementFactorLabel = new Label("Movement Factor:");
 		TextField movementFactorField = new TextField("1");
@@ -710,7 +788,14 @@ public class DungeonVisualizer extends Application {
 
 		// show center point
 		HBox showCenterPointBox = addVisibleToggle("Show Center Point:", showCenterPoint, labels, hBoxes, context.getCenterPoint(), (visualizer, bool) -> {
+			// re-calc position
+			int midX = (Integer.valueOf(widthField.getText()) * tileWidth) / 2;
+			int midY = (Integer.valueOf(heightField.getText()) * tileHeight) / 2;
+			
+			AnchorPane.setLeftAnchor(context.getCenterPoint().getChildren().get(0), (double) midX-3);
+			AnchorPane.setTopAnchor(context.getCenterPoint().getChildren().get(0), (double) midY-3);
 			visualizer.setShowCenterPoint(bool);
+			
 		});
 
 		// show spawn boundary
@@ -759,17 +844,61 @@ public class DungeonVisualizer extends Application {
 		newButton.setOnAction(new EventHandler<ActionEvent>() {
 			@Override public void handle(ActionEvent e) {
 
+				// reset
+				dungeonGenerator.withStartRoom(null);
+				dungeonGenerator.withEndRoom(null);
+				
+				// check pre-build properties
+				if (!Strings.isBlank(startPositionLocked) && !startPositionLocked.equalsIgnoreCase("none")) {
+					Coords2D centerPoint = null;
+					if (startPositionLocked.equalsIgnoreCase("bottom")) {
+						centerPoint = new Coords2D(Integer.valueOf(widthField.getText()) / 2, Integer.valueOf(heightField.getText()));
+					}
+					
+					int minRoomSize = Math.max(5, Integer.valueOf(minRoomSizeField.getText()));
+					int maxRoomSize = Math.max(5, Integer.valueOf(maxRoomSizeField.getText()));
+					int sizeX = maxRoomSize == minRoomSize ? minRoomSize : random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
+					int sizeY = maxRoomSize == minRoomSize ? minRoomSize : random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
+					IRoom startRoom = new Room(new Coords2D(centerPoint.getX() - (sizeX / 2), centerPoint.getY() - sizeY -1), sizeX, sizeY);
+					startRoom.setRole(RoomRole.MAIN).setType(NodeType.START).setMaxDegrees(5).setId(0);
+					startRoom.getFlags().add(RoomFlag.NO_INTERSECTION);
+					startRoom.getFlags().add(RoomFlag.ANCHOR);
+					dungeonGenerator.withStartRoom(startRoom);
+				}		
+				
+				// TODO create method
+				// end room
+				if (!Strings.isBlank(endPositionLocked) && !endPositionLocked.equalsIgnoreCase("none")) {
+					Coords2D centerPoint = null;
+					if (endPositionLocked.equalsIgnoreCase("top")) {
+						centerPoint = new Coords2D(Integer.valueOf(widthField.getText()) / 2, 0);
+					}
+					int minRoomSize = Math.max(5, Integer.valueOf(minRoomSizeField.getText()));
+					int maxRoomSize = Math.max(5, Integer.valueOf(maxRoomSizeField.getText()));
+					int sizeX = maxRoomSize == minRoomSize ? minRoomSize : random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
+					int sizeY = maxRoomSize == minRoomSize ? minRoomSize : random.nextInt(maxRoomSize - minRoomSize) + minRoomSize;
+					IRoom endRoom = new Room(new Coords2D(centerPoint.getX() - (sizeX / 2), 1), sizeX, sizeY);
+					endRoom.setRole(RoomRole.MAIN).setType(NodeType.END).setMaxDegrees(2).setId(999);
+					endRoom.getFlags().add(RoomFlag.NO_INTERSECTION);
+					endRoom.getFlags().add(RoomFlag.ANCHOR);
+					dungeonGenerator.withEndRoom(endRoom);
+				}
+	
 				level = (DungeonLevel) dungeonGenerator
 						.withSpawnBoxWidth(Integer.valueOf(spawnBoundaryWidthField.getText()))
 						.withSpawnBoxHeight(Integer.valueOf(spawnBoundaryHeightField.getText()))
+						.withNumberOfSeeds(Integer.valueOf(numSeedsField.getText()))
 						.withNumberOfRooms(Integer.valueOf(numRoomsField.getText()))
 						.withMinRoomSize(Math.max(5, Integer.valueOf(minRoomSizeField.getText())))
 						.withMaxRoomSize(Math.max(5, Integer.valueOf(maxRoomSizeField.getText())))
+						.withMaxRoomDegrees(Integer.valueOf(maxRoomDegreesField.getText()))
+						.withMaxStartRoomDegrees(Integer.valueOf(maxStartRoomDegreesField.getText()))
+						.withMaxEndRoomDegrees(Integer.valueOf(maxEndRoomDegreesField.getText()))
 						.withMovementFactor(Integer.valueOf(movementFactorField.getText()))
 						.withMeanFactor(Double.valueOf(meanFactorField.getText()))
 						.withPathFactor(Double.valueOf(pathFactorField.getText()))
-						.withHeight(Integer.valueOf(widthField.getText()))
-						.withWidth(Integer.valueOf(heightField.getText()))
+						.withWidth(Integer.valueOf(widthField.getText()))
+						.withHeight(Integer.valueOf(heightField.getText()))
 						.build();
 
 				buildMapPane(mapBox, level);
@@ -790,8 +919,8 @@ public class DungeonVisualizer extends Application {
 						.withMovementFactor(Integer.valueOf(movementFactorField.getText()))
 						.withMeanFactor(Double.valueOf(meanFactorField.getText()))
 						.withPathFactor(Double.valueOf(pathFactorField.getText()))
-						.withHeight(Integer.valueOf(widthField.getText()))
-						.withWidth(Integer.valueOf(heightField.getText()))
+						.withWidth(Integer.valueOf(widthField.getText()))
+						.withHeight(Integer.valueOf(heightField.getText()))
 						.init();
 
 				hasIntersections = true;
@@ -866,7 +995,9 @@ public class DungeonVisualizer extends Application {
 		pane.getChildren().addAll(
 				widthBox, heightBox, 
 				spawnBoundaryWidthBox, spawnBoundaryHeightBox, 
-				numLevelsBox, numRoomsBox, minRoomSizeBox, maxRoomSizeBox, 
+				numLevelsBox, numSeedsBox, numRoomsBox, minRoomSizeBox, maxRoomSizeBox, 
+				maxRoomDegreesBox, maxStartRoomDegreesBox, maxEndRoomDegreesBox,
+				startLockedBox, endLockedBox,
 				movementFactorBox, meanFactorBox, pathFactorBox, 
 				showGridBox, showCenterPointBox, showSpawnBoundaryBox, showNonRoomsBox, showEdgesBox, showPathsBox,
 				showWaylinesBox, showCorridorsBox, showExitsBox,
@@ -915,6 +1046,50 @@ public class DungeonVisualizer extends Application {
 		return hBox;
 	}
 
+	private HBox addPositionLockToggle(String labelText, List<Label> labels, List<HBox> hBoxes, BiConsumer<DungeonVisualizer, String> setter) {
+		ToggleGroup group = new ToggleGroup();
+		Label label = new Label(labelText);
+		RadioButton noneButton = new RadioButton();
+		RadioButton topButton = new RadioButton();
+		RadioButton bottomButton = new RadioButton();
+		RadioButton leftButton = new RadioButton();
+		RadioButton rightButton = new RadioButton();
+		
+		noneButton.setText("None");
+		noneButton.setUserData("none");
+		noneButton.setToggleGroup(group);
+		noneButton.setSelected(true);
+		
+		topButton.setText("Top");
+		topButton.setUserData("top");
+		topButton.setToggleGroup(group);
+		
+		bottomButton.setText("Bottom");
+		bottomButton.setUserData("bottom");
+		bottomButton.setToggleGroup(group);
+		
+		leftButton.setText("Left");
+		leftButton.setUserData("left");
+		leftButton.setToggleGroup(group);
+		
+		rightButton.setText("Right");
+		rightButton.setUserData("right");
+		rightButton.setToggleGroup(group);
+		
+		group.selectedToggleProperty().addListener(new ChangeListener<Toggle> () {
+			public void changed(ObservableValue<? extends Toggle> ov, Toggle oldToggle, Toggle newToggle) {
+				RadioButton rb = (RadioButton)group.getSelectedToggle();
+				setter.accept(DungeonVisualizer.this, (String)rb.getUserData());
+				// TODO set the value in DungeonVisualizer
+			}
+		});	
+				
+		HBox hBox = new HBox(label, new VBox(new HBox(noneButton), new HBox(topButton, bottomButton), new HBox(leftButton, rightButton)));
+		labels.add(label);
+		hBoxes.add(hBox);
+		return hBox;
+	}
+	
 	private HBox addVisibleToggle(String labelText, boolean defaultValue, List<Label>labels, List<HBox> hBoxes, Pane pane, BiConsumer<DungeonVisualizer, Boolean> setter) {
 		ToggleGroup group = new ToggleGroup();
 		Label label = new Label(labelText);

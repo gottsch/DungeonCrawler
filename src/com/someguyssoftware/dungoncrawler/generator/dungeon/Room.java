@@ -15,14 +15,14 @@ import com.someguyssoftware.dungoncrawler.generator.Rectangle2D;
  * @author Mark Gottschling on Sep 15, 2020
  *
  */
-// TODO extends AbstractGraphNode
-public class Room implements IRoom, IDungeonElement {
+public class Room extends BaseRoom implements IDungeonElement {
 	private int id;
-	private Rectangle2D box;
 	private int maxDegrees;
 	private NodeType nodeType;
+	// TODO move below out to BaseRoom
+	private Rectangle2D box;
 	private RoomRole roomRole;
-	private List<RoomFlag> flags;
+	private List<RoomFlag> flags; // TODO should be a Set<>
 	private List<Coords2D> exits;
 	
 	/**
@@ -30,6 +30,7 @@ public class Room implements IRoom, IDungeonElement {
 	 */
 	public Room() {
 		// ensure all required fields (ex box) are generated lazily in getters if allowing empty constructors
+		super();
 	}
 	
 	/*
@@ -46,6 +47,7 @@ public class Room implements IRoom, IDungeonElement {
 	 * @param depth
 	 */
 	public Room(Coords2D origin, int width, int depth) {
+		super();
 		this.box = new Rectangle2D(origin, width, depth);
 		this.maxDegrees = 3;
 		this.nodeType = NodeType.STANDARD;
@@ -175,5 +177,4 @@ public class Room implements IRoom, IDungeonElement {
 	public boolean hasFlag(RoomFlag flag) {
 		return getFlags().contains(flag);
 	}
-
 }
