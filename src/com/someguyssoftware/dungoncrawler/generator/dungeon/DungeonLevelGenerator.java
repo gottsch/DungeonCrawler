@@ -1027,7 +1027,8 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * @param node2
 	 * @return
 	 */
-	public Wayline getHorizontalWayline(final INode node1, final INode node2) {
+	public Wayline
+	getHorizontalWayline(final INode node1, final INode node2) {
 		/*
 		 * get the min of the max's of x-axis from the 2 nodes AND get the max of the
 		 * min's of x-axis from the 2 nodes
