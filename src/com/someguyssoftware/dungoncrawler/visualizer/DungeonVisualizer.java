@@ -1151,7 +1151,14 @@ public class DungeonVisualizer extends Application {
 					int x = corridor.getBox().getOrigin().getX() + w;
 					int y = corridor.getBox().getOrigin().getY() + d;
 					if ( x >= 0 && y >= 0 && x < cellMap.length && y < cellMap[0].length) {
-						cellMap[corridor.getBox().getOrigin().getX() + w][corridor.getBox().getOrigin().getY() + d] = true;
+						// TEMP don't draw the walls to test the overlap protect with rooms
+						if (corridor.getBox().getOrigin().getX() +w < corridor.getBox().getMaxX() &&
+								corridor.getBox().getOrigin().getX() +w > corridor.getBox().getMinX() &&
+								corridor.getBox().getOrigin().getY() +d < corridor.getBox().getMaxY() &&
+								corridor.getBox().getOrigin().getY() +d > corridor.getBox().getMinY()
+						) {
+							cellMap[corridor.getBox().getOrigin().getX() + w][corridor.getBox().getOrigin().getY() + d] = true;
+						}
 					}
 				}
 			}

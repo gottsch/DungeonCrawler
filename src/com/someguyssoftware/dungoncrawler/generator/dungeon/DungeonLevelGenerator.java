@@ -107,6 +107,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		// select main rooms
 		List<IRoom> mainRooms = selectMainRooms(rooms, meanFactor);
 
+		// TODO should be it's own method to return reordered room
 		/*
 		 * reset ids add main rooms to an ordered list. (because of how
 		 * DelaunayTriangulator works, the main rooms need to in a ordered list AND
@@ -126,6 +127,10 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 				end = room;
 			}
 		}
+		// TODO don't really need to grab the start and end during processing as start will always be the first node and end will be the last
+
+		// TODO use Adapter pattern here and separate INode from IRoom.
+		// create a new class that implements INode and is composed of an IRoom
 
 		// map the rooms
 		//		Map<Integer, IDungeonRoom> roomMap = mapRooms(orderedMainRooms);
@@ -685,9 +690,13 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 				if (intersectRooms.isPresent()) {
 					boolean hasIntersects = true;
 					int failSafe = 1;
+					// TODO something is wrong in here
+					// 1) aStarWaylines is creating a list of waysline with connector that have room.id == null and next == null
+					// 2) after finding the astar waylines, it is not used for any further calcs, instead the original is re-calculated.
 					do {
 						Optional<List<Wayline>> aStarWaylines = findAStarPath(wayline, intersectRooms.get());
 						if (aStarWaylines.isPresent()) {
+							// TODO shouldn't this be processing all the astar waylines?
 							Optional<List<IRoom>> newIntersectRooms = getIntersects(wayline, rooms, room1, room2);
 							if (newIntersectRooms.isPresent()) {
 								// more intersects
@@ -855,7 +864,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 			}
 			if (intersects(room, wayline)) {
 				if(room.hasFlag(RoomFlag.NO_INTERSECTION)) {
-					LOGGER.debug("room -> {} is flagged as no itersection from room -> {} to room -> {}", room.getId(), room1.getId(), room2.getId());
+					LOGGER.debug("room -> {} is flagged as no intersection from room -> {} to room -> {}", room.getId(), room1.getId(), room2.getId());
 					intersectRooms.add(room);
 				}
 			}
@@ -1094,7 +1103,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 			totalArea += room.getBox().getWidth() * room.getBox().getHeight();
 		}
 
-		int meanArea = (int) totalArea / rooms.size();
+		int meanArea = (int) ((totalArea / rooms.size()) * meanFactor);
 
 		rooms.forEach(room -> {
 			if (room.getRole() == RoomRole.MAIN || room.getType() == NodeType.START || room.getType() == NodeType.END
@@ -1147,8 +1156,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 	 * 
 	 * @param sourceRooms
 	 * @param movementFactor dictates how much to move a R at a time. lower number
-	 *                       mean the Rs will be closer together but more iterations
-	 *                       performed
+	 *                       mean the Rs will be closer together but more iterations performed
 	 * @return
 	 */
 	public List<IRoom> separateRooms(List<IRoom> sourceRooms, int movementFactor) {
@@ -1294,7 +1302,7 @@ public class DungeonLevelGenerator extends AbstractGraphLevelGenerator {
 		}
 
 		// TODO add pre-gen rooms
-		// TODO ensure that if pre-gen room has connectors, then maxDegrees == connectors
+		// TODO ensure that if pre-gen room has connectors, then maxDegrees == Math.min(connectors, maxDegrees)
 
 		// have to have at least one end room
 		IRoom endRoom = null;

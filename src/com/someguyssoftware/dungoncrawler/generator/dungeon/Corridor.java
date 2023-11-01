@@ -44,9 +44,17 @@ public class Corridor implements IDungeonElement {
 	 */
 	public void findIntersections(List<IRoom> rooms) {
 
-		for (IRoom intersectingRoom : rooms) {
-			if (intersectingRoom.getBox().intersects(getBox())) {
-				getIntersectsWith().add(intersectingRoom);
+		for (IRoom room : rooms) {
+			if (room.getBox().intersects(getBox())) {
+				// test where it intersects with ie if the cooridor intersect with the wall/border of room, then ignore
+				if (!(getBox().getMaxX() > room.getMinX() || getBox().getMinX() < room.getMaxX() ||
+						getBox().getMaxY() > room.getMinY() || getBox().getMinY() < room.getMaxY())
+				// TEMP test center until walls are added as part of corridor's size during build
+						|| getBox().getOrigin().getX() == room.getMinX() || getBox().getOrigin().getX() == room.getMaxX() ||
+						getBox().getOrigin().getY() == room.getMinY() || getBox().getOrigin().getY() == room.getMaxY()
+				) {
+					getIntersectsWith().add(room);
+				}
 			}
 		}
 	}
