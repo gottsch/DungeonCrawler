@@ -1,15 +1,13 @@
 package dungoncrawler.visualizer;
 
 import dungoncrawler.generator.Coords2D;
-import dungoncrawler.generator.ILevel;
-import dungoncrawler.generator.cave.CaveLevel;
-import dungoncrawler.generator.maze.level.IMazeLevel;
-import dungoncrawler.generator.maze.level.IMazeLevelGenerator;
-import dungoncrawler.generator.maze.level.MazeLevelGenerator;
-import dungoncrawler.generator.maze.room.IMazeRoom;
-import dungoncrawler.generator.maze.room.MazeRoom;
-import dungoncrawler.generator.maze.room.RoomRole;
-import dungoncrawler.generator.maze.room.RoomType;
+import dungoncrawler.generator._maze.level.IMazeLevel;
+import dungoncrawler.generator._maze.level.IMazeLevelGenerator;
+import dungoncrawler.generator._maze.level.MazeLevelGenerator;
+import dungoncrawler.generator._maze.room.IMazeRoom;
+import dungoncrawler.generator._maze.room.MazeRoom;
+import dungoncrawler.generator._maze.room.RoomRole;
+import dungoncrawler.generator._maze.room.RoomType;
 import javafx.application.Application;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;

@@ -2,8 +2,8 @@ package dungoncrawler.visualizer;
 
 import dungoncrawler.generator.Coords2D;
 import dungoncrawler.generator.Rectangle2D;
-import dungoncrawler.generator.maze.room.IMazeRoom;
-import dungoncrawler.generator.maze2.*;
+import dungoncrawler.generator._maze.room.IMazeRoom;
+import dungoncrawler.generator.maze.*;
 import javafx.application.Application;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
@@ -23,6 +23,8 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.*;
 
@@ -32,20 +34,21 @@ import java.util.*;
  */
 public class MazeVisualizer2 extends Application {
     // TODO create a list of pre-made colors for regions; (like 10)
+    protected static final Logger LOGGER = LogManager.getLogger();
 
     int tileWidth = 7;
     int tileHeight = 7;
 
-    Map<MazeRegion2D, Color> regionColorMap = new HashMap<>();
+    Map<Integer, Color> regionColorMap = new HashMap<>();
 
-    MazeLevelGenerator generator = new MazeLevelGenerator.Builder()
+    MazeLevelGenerator2D generator = new MazeLevelGenerator2D.Builder()
             .with($ -> {
                 $.width = 95;
                 $.height = 95;
                 $.minSize = 7;
                 $.maxSize = 19;
-                $.attemptsMax = 1000;
-                $.meanFactor = 0.60;
+                $.attemptsMax = 2000;
+                $.meanFactor = 0.80;
             }).build();
 
     public static void main(String[] args) {
@@ -81,18 +84,21 @@ public class MazeVisualizer2 extends Application {
     public void buildInputPane(VBox pane, HBox mapBox) {
         pane.setPadding(new Insets(5, 5, 5, 5));
 
-        List<TextField> fields = new ArrayList<>();
         List<VBox> vBoxes = new ArrayList<>();
 
-        TextField x = addField(pane, "my label:", "1");
+        TextField widthField = addField(pane, "Width:", 95);
+        TextField heightField = addField(pane, "Height:", 95);
 
         // number of rooms
-        TextField numRoomsField = addField(pane, "# of Rooms:", "25");
+        TextField numRoomsField = addField(pane, "# of Rooms:", 25);
 
-        TextField runContinuationField = addField(pane, "Run Continuation:", "0.8");
+        TextField minCorridorRunField = addField(pane, "Min. Corridor Run:", 250);
+        TextField maxCorridorRunField = addField(pane, "Max. Corridor Run:", 500);
+
+        TextField runContinuationField = addField(pane, "Run Continuation:", 0.8);
 
         // curve factor
-        TextField curveFactorField = addField(pane, "Curve:", "0.8");
+        TextField curveFactorField = addField(pane, "Curve:", 0.8);
 
         // buttons
 //        HBox buttonsBox = new HBox();
@@ -111,9 +117,13 @@ public class MazeVisualizer2 extends Application {
                 endRoom.setEnd(true);
                 endRoom.getDoorways().add(new Coords2D(20, 10));
 
-                generator.setStartRoom(startRoom);
-                generator.setEndRoom(endRoom);
+//                generator.setStartRoom(startRoom);
+//                generator.setEndRoom(endRoom);
+                generator.setWidth(Integer.valueOf(widthField.getText()));
+                generator.setHeight(Integer.valueOf(heightField.getText()));
                 generator.setNumberOfRooms(Integer.valueOf(numRoomsField.getText()));
+                generator.setMinCorridorSize(Integer.valueOf(minCorridorRunField.getText()));
+                generator.setMaxCorridorSize(Integer.valueOf(maxCorridorRunField.getText()));
                 generator.setRunFactor(Double.valueOf(runContinuationField.getText()));
                 generator.setCurveFactor(Double.valueOf(curveFactorField.getText()));
                 Optional<ILevel2D> level = generator.generate();
@@ -124,11 +134,6 @@ public class MazeVisualizer2 extends Application {
         buttonsBox.getChildren().addAll(newButton);
         vBoxes.add(buttonsBox);
 
-        for (TextField field : fields) {
-            field.setMinSize(30, 15);
-            field.setMaxSize(50, 20);
-        }
-
         // formatting for the vboxes
         for (VBox box : vBoxes) {
             box.setPadding(new Insets(5, 0, 0, 0));
@@ -138,15 +143,23 @@ public class MazeVisualizer2 extends Application {
         pane.getChildren().addAll(buttonsBox);
     }
 
+    private TextField addField(VBox pane, String label, Double value) {
+        return addField(pane, label, String.valueOf(value));
+    }
+
+    private TextField addField(VBox pane, String label, Integer value) {
+        return addField(pane, label, String.valueOf(value));
+    }
+
     /**
      *
      * @param pane
-     * @param s
+     * @param labelText
      * @param value
      * @return
      */
-    private TextField addField(VBox pane, String s, String value) {
-        Label label = new Label(s);
+    private TextField addField(VBox pane, String labelText, String value) {
+        Label label = new Label(labelText);
         TextField field = new TextField(value);
         HBox box = new HBox(label, field);
 
@@ -202,27 +215,20 @@ public class MazeVisualizer2 extends Application {
                 Color color = null;
                 Color fillColor = null;
                 byte id = map.getId(x, y);
-                if (id == MazeLevelGenerator.ROCK) {
-                    // rock - just outline
-                    color = Color.rgb(32, 32, 32);
+                // default outline color
+                color = Color.rgb(32, 32, 32);
+                if (id == MazeLevelGenerator2D.ROCK) {
                     fillColor = Color.BLACK;
-                } else if (id == MazeLevelGenerator.WALL) {
+                } else if (id == MazeLevelGenerator2D.WALL) {
                     // wall - beige
-                    color = Color.rgb(32, 32, 32);
                     fillColor = Color.rgb(64, 64, 64); //Color.BLANCHEDALMOND;
-                } else if (id == MazeLevelGenerator.InternalIDs.CONNECTOR.getId()) {
-//                    color = Color.BLACK;
-//                    fillColor = Color.HOTPINK;
-                    color = Color.rgb(32, 32, 32);
+                } else if (id == MazeLevelGenerator2D.InternalIDs.CONNECTOR.getId()) {
                     fillColor = Color.rgb(64, 64, 64);
-                    // TODO finish adding a circle
                     circle = new Circle((x * tileWidth) + (int) (tileWidth / 2), (y * tileHeight) + (int) (tileHeight / 2), 1);
                     circle.setStrokeWidth(0.5);
                     circle.setStroke(Color.WHITE);
                     circle.setFill(Color.WHITE);
-                } else if (id == MazeLevelGenerator.DOOR) {
-                    // wall colors
-                    color = Color.rgb(32, 32, 32);
+                } else if (id == MazeLevelGenerator2D.DOOR) {
                     fillColor = Color.rgb(64, 64, 64);
                     // setup door
                     door = new Rectangle((x * tileWidth) + 2, (y * tileHeight) + 1, (int)(tileWidth /2), tileHeight -2);
@@ -236,15 +242,13 @@ public class MazeVisualizer2 extends Application {
                     fillColor = Color.RED;
                     color = Color.RED;
                 } else {
-                    // get the region from the level based on id
-                    MazeRegion2D region = level.getRegionMap().get(Integer.valueOf(id));
                     // TODO cache the region id and color
-                    fillColor = regionColorMap.get(region);
+                    fillColor = regionColorMap.get((int) id);
                     if (fillColor == null) {
                         fillColor = Color.rgb(random.nextInt(256), random.nextInt(256), random.nextInt(256));
-                        regionColorMap.put(region, fillColor);
+                        regionColorMap.put((int) id, fillColor);
                     }
-                    color = fillColor; //Color.rgb(64, 64, 64);
+                    color = fillColor;
                 }
                 if (color != null) {
                     tile.setStroke(color);
@@ -260,7 +264,6 @@ public class MazeVisualizer2 extends Application {
             }
         }
         // process all the rooms
-        // TODO process the cellmap - just need to read the map and draw each cell
         level.getRooms().forEach(room -> {
             // add ids
             Text text = new Text(startX + (room.getOrigin().getX() * tileWidth) + 7,
@@ -308,19 +311,5 @@ public class MazeVisualizer2 extends Application {
         Rectangle bg = new Rectangle(0, 0, level.getWidth() * tileWidth, level.getHeight() * tileHeight);
         bg.setFill(Color.BLACK);
         container.getChildren().add(bg);
-    }
-
-    /**
-     *
-     * @param room
-     * @return
-     */
-    private Paint selectRoomColor(IMazeRoom room) {
-        Paint color = null;
-        return switch(room.getType()) {
-            case START -> Color.GREEN;
-            case END -> Color.RED;
-            default -> Color.CYAN;
-        };
     }
 }

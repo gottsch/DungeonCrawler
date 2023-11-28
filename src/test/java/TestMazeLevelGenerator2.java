@@ -1,6 +1,6 @@
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dungoncrawler.generator.maze2.ILevel2D;
-import dungoncrawler.generator.maze2.MazeLevelGenerator;
+import dungoncrawler.generator.maze.ILevel2D;
+import dungoncrawler.generator.maze.MazeLevelGenerator2D;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.Test;
@@ -13,7 +13,7 @@ public class TestMazeLevelGenerator2 {
 
     @Test
     public void createMazeLevelGen() {
-        MazeLevelGenerator generator = new MazeLevelGenerator.Builder()
+        MazeLevelGenerator2D generator = new MazeLevelGenerator2D.Builder()
                 .with($ -> {
                     $.width = 95;
                     $.height = 95;

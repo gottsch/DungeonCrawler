@@ -1,9 +1,8 @@
 import dungoncrawler.generator.Coords2D;
-import dungoncrawler.generator.ILevel;
-import dungoncrawler.generator.maze.level.IMazeLevel;
-import dungoncrawler.generator.maze.level.IMazeLevelGenerator;
-import dungoncrawler.generator.maze.level.MazeLevelGenerator;
-import dungoncrawler.generator.maze.room.MazeRoom;
+import dungoncrawler.generator._maze.level.IMazeLevel;
+import dungoncrawler.generator._maze.level.IMazeLevelGenerator;
+import dungoncrawler.generator._maze.level.MazeLevelGenerator;
+import dungoncrawler.generator._maze.room.MazeRoom;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.Test;
