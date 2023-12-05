@@ -2,7 +2,6 @@ package dungoncrawler.visualizer;
 
 import dungoncrawler.generator.Coords2D;
 import dungoncrawler.generator.Rectangle2D;
-import dungoncrawler.generator._maze.room.IMazeRoom;
 import dungoncrawler.generator.maze.*;
 import javafx.application.Application;
 import javafx.event.ActionEvent;
@@ -16,7 +15,6 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.paint.Paint;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
@@ -214,21 +212,22 @@ public class MazeVisualizer2 extends Application {
                 tile.setStrokeWidth(0.5);
                 Color color = null;
                 Color fillColor = null;
-                byte id = map.getId(x, y);
+                int id = map.get(x, y).getRegionId();
+                CellType cellType = map.get(x, y).getType();
                 // default outline color
                 color = Color.rgb(32, 32, 32);
-                if (id == MazeLevelGenerator2D.ROCK) {
+                if (cellType == CellType.ROCK) {
                     fillColor = Color.BLACK;
-                } else if (id == MazeLevelGenerator2D.WALL) {
+                } else if (cellType == CellType.WALL) {
                     // wall - beige
                     fillColor = Color.rgb(64, 64, 64); //Color.BLANCHEDALMOND;
-                } else if (id == MazeLevelGenerator2D.InternalIDs.CONNECTOR.getId()) {
+                } else if (cellType == CellType.CONNECTOR) {
                     fillColor = Color.rgb(64, 64, 64);
                     circle = new Circle((x * tileWidth) + (int) (tileWidth / 2), (y * tileHeight) + (int) (tileHeight / 2), 1);
                     circle.setStrokeWidth(0.5);
                     circle.setStroke(Color.WHITE);
                     circle.setFill(Color.WHITE);
-                } else if (id == MazeLevelGenerator2D.DOOR) {
+                } else if (cellType == CellType.DOOR) {
                     fillColor = Color.rgb(64, 64, 64);
                     // setup door
                     door = new Rectangle((x * tileWidth) + 2, (y * tileHeight) + 1, (int)(tileWidth /2), tileHeight -2);

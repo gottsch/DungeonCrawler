@@ -36,30 +36,13 @@ public class MazeLevelGenerator2D {
     private static final int DEFAULT_MIN_CORRIDOR_SIZE = 250;
     private static final int DEFAULT_MAX_CORRIDOR_SIZE = 500;
 
-    ////////////// processing constants ///////////////
-    public static enum InternalIDs {
-        ROCK(0),
-        WALL(1),
-        CONNECTOR(2),
-        DOOR(3);
-
-        final int id;
-        InternalIDs(int id) {
-            this.id = id;
-        }
-
-        public int getId() {
-            return id;
-        }
-    };
-
     ////// convenience constants /////
     // initial state of tile in the grid
-    public static final byte ROCK = (byte)InternalIDs.ROCK.getId();
-    // aka visited rock state
-    public static final byte WALL = (byte)InternalIDs.WALL.getId();
-    public static final byte CONNECTOR = (byte)InternalIDs.CONNECTOR.getId();
-    public static final byte DOOR = (byte)InternalIDs.DOOR.getId();
+//    public static final byte ROCK = (byte) CellType.ROCK.getId();
+//    // aka visited rock state
+//    public static final byte WALL = (byte) CellType.WALL.getId();
+//    public static final byte CONNECTOR = (byte) CellType.CONNECTOR.getId();
+//    public static final byte DOOR = (byte) CellType.DOOR.getId();
 
     ////////////// generator properties ///////////////
     private int width = DEFAULT_WIDTH;
@@ -82,7 +65,7 @@ public class MazeLevelGenerator2D {
     /*
      * An object to generate and keep track of ids.
      */
-    private final IdGenerator idGenerator = new IdGenerator(InternalIDs.values().length + 1);
+    private final IdGenerator idGenerator = new IdGenerator(CellType.values().length + 1);
 
     /*
      * A list of all rooms that are supplied as input to the generator.
@@ -435,7 +418,7 @@ public class MazeLevelGenerator2D {
         for (int x = 1; x < level.getWidth()-1; x+=2) {
             for (int y = 1; y < level.getHeight()-1; y+=2) {
                 // find an unvisited rock
-                if (level.getGrid().getId(x, y) == ROCK) {
+                if (level.getGrid().get(x, y).getType() == CellType.ROCK) {
                     // add cell to the active list
                     prims(level, new Coords2D(x, y));
                 }
@@ -477,7 +460,7 @@ public class MazeLevelGenerator2D {
         for (int x = 1; x < level.getWidth()-1; x++) {
             for (int y = 1; y < level.getHeight()-1; y++) {
                 // find any wall
-                if (level.getGrid().getId(x, y) == WALL) {
+                if (level.getGrid().get(x, y).getType() == CellType.WALL) {
                     generateConnector(level, connectors, x, y, ignoreIds);
                 }
             }
@@ -497,11 +480,11 @@ public class MazeLevelGenerator2D {
      * @param y
      */
     private boolean generateConnector(ILevel2D level, List<Connector2D> connectors, int x, int y, List<Integer> ignoreIds) {
-        byte northId = level.getGrid().getId(x, y-1);
-        byte southId = level.getGrid().getId(x, y+1);
+        int northId = level.getGrid().get(x, y-1).getRegionId();
+        int southId = level.getGrid().get(x, y+1).getRegionId();
         // test east and west
-        byte eastId = level.getGrid().getId(x+1, y);
-        byte westId = level.getGrid().getId(x-1, y);
+        int eastId = level.getGrid().get(x+1, y).getRegionId();
+        int westId = level.getGrid().get(x-1, y).getRegionId();
 
         if (ignoreIds != null && (ignoreIds.contains((int)northId) || ignoreIds.contains((int)southId) ||
                 ignoreIds.contains((int)eastId) || ignoreIds.contains((int)westId))) {
@@ -529,7 +512,7 @@ public class MazeLevelGenerator2D {
             // add connector to list
             connectors.add(connector);
             // update grid with id = CONNECTOR
-            level.getGrid().setId(connector.getCoords(), CONNECTOR);
+            level.getGrid().get(connector.getCoords()).setType(CellType.CONNECTOR);
         }
         else if (eastId >= idGenerator.getStart() && westId >= idGenerator.getStart() && eastId != westId) {
             MazeRegion2D region1 = getRegionMap().get((int)eastId);
@@ -548,7 +531,7 @@ public class MazeLevelGenerator2D {
 
             Connector2D connector = new Connector2D(x, y, region1, region2);
             connectors.add(connector);
-            level.getGrid().setId(connector.getCoords(), CONNECTOR);
+            level.getGrid().get(connector.getCoords()).setType(CellType.CONNECTOR);
         }
         return true;
     }
@@ -603,7 +586,7 @@ public class MazeLevelGenerator2D {
             getConnectors().removeAll(mainDoorAdjacents);
             mainDoorAdjacents.remove(connector);
             mainDoorAdjacents.forEach(adjacent -> {
-                level.getGrid().setId(adjacent.getCoords(), WALL);
+                level.getGrid().get(adjacent.getCoords()).setType(CellType.WALL);
                 getConnectors().remove(adjacent);
             });
 
@@ -623,7 +606,7 @@ public class MazeLevelGenerator2D {
                     List<Connector2D> adjacents = selectAdjacentConnectors(c, connectors);
                     adjacents.remove(c);
                     adjacents.forEach(c2 -> {
-                        level.getGrid().setId(c2.getCoords(), WALL);
+                        level.getGrid().get(c2.getCoords()).setType(CellType.WALL);
                         getConnectors().remove(c2);
                     });
                     // add all the connectors to a temporary remove list so as to not process again
@@ -631,7 +614,7 @@ public class MazeLevelGenerator2D {
                     connectorCount++;
                 } else {
                     // replace with wall
-                    level.getGrid().setId(c.getCoords(), WALL);
+                    level.getGrid().get(c.getCoords()).setType(CellType.WALL);
                 }
                 // remove connector from level
                 getConnectors().remove(c);
@@ -678,32 +661,32 @@ public class MazeLevelGenerator2D {
      */
     private void backFill(ILevel2D level, Coords2D startingCoords) {
         Coords2D active = startingCoords;
-        List<Byte> elements = Arrays.asList(ROCK, WALL);
+        List<CellType> elements = Arrays.asList(CellType.ROCK, CellType.WALL);
 
         while (active != null) {
             int wallCount = 0;
             Coords2D next = null;
 
             // test for 3 wall
-            if (elements.contains(level.getGrid().getId(active.getX(), active.getY()-1))) {
+            if (elements.contains(level.getGrid().get(active.getX(), active.getY()-1).getType())) {
                 wallCount++;
             }
             else {
                 next = new Coords2D(active.getX(), active.getY()-1);
             }
-            if (elements.contains(level.getGrid().getId(active.getX(), active.getY()+1))) {
+            if (elements.contains(level.getGrid().get(active.getX(), active.getY()+1).getType())) {
                 wallCount++;
             }
             else {
                 next = new Coords2D(active.getX(), active.getY()+1);
             }
-            if (elements.contains(level.getGrid().getId(active.getX()+1, active.getY()))) {
+            if (elements.contains(level.getGrid().get(active.getX()+1, active.getY()).getType())) {
                 wallCount++;
             }
             else {
                 next = new Coords2D(active.getX()+1, active.getY());
             }
-            if (elements.contains(level.getGrid().getId(active.getX()-1, active.getY()))) {
+            if (elements.contains(level.getGrid().get(active.getX()-1, active.getY()).getType())) {
                 wallCount++;
             }
             else {
@@ -712,7 +695,7 @@ public class MazeLevelGenerator2D {
 
             if (wallCount >= 3) {
                 // update level with WALL
-                level.getGrid().setId(active, ROCK);
+                level.getGrid().get(active).setType(CellType.ROCK);
 
                 // move to the tile in the open direction
                 active = next;
@@ -730,7 +713,7 @@ public class MazeLevelGenerator2D {
      * @param roomMap
      */
     private void addDoor(ILevel2D level, Connector2D connector, Map<Integer, IRoom2D> roomMap) {
-        level.getGrid().setId(connector.getCoords(), DOOR);
+        level.getGrid().get(connector.getCoords()).setType(CellType.DOOR);
         // update the rooms
         IRoom2D room = roomMap.get(connector.getRegion1().getId());
         if (room != null) {
@@ -748,12 +731,12 @@ public class MazeLevelGenerator2D {
      * @param startCoords
      */
     private void prims(ILevel2D level, Coords2D startCoords) {
-        List<Tile2D> activeList = new ArrayList<>();
-        Map<Direction2D, Tile2D> neighbors = new HashMap<>();
-        Map<Direction2D, Tile2D> passages = new HashMap<>();
+        List<PrimsTile2D> activeList = new ArrayList<>();
+        Map<Direction2D, PrimsTile2D> neighbors = new HashMap<>();
+        Map<Direction2D, PrimsTile2D> passages = new HashMap<>();
         int maxRun = random.nextInt(maxCorridorSize - minCorridorSize) + minCorridorSize;
         // create tile
-        Tile2D tile = new Tile2D(startCoords, Direction2D.SOUTH);
+        PrimsTile2D tile = new PrimsTile2D(startCoords, Direction2D.SOUTH);
 
         // add tile to activeList
         activeList.add(tile);
@@ -769,12 +752,13 @@ public class MazeLevelGenerator2D {
         getRegionMap().put(region.getId(), region);
 
         // update the grid with the active region
-        level.getGrid().setId(tile.getCoords(), region.getId().byteValue());
+        level.getGrid().get(tile.getCoords()).setType(CellType.CORRIDOR);
+        level.getGrid().get(tile.getCoords()).setRegionId(region.getId());
 
         int runCount = 0;
         while(!activeList.isEmpty()) {
             // randomly select a cell from the active list
-            Tile2D active = null;
+            PrimsTile2D active = null;
             if (random.nextDouble() < runFactor) {
                 active = activeList.get(activeList.size()-1);
             } else {
@@ -785,39 +769,40 @@ public class MazeLevelGenerator2D {
             neighbors.clear();
             passages.clear();
 
+            // TODO how was -1, -1 array index prevented before ???
             // get neighbors of active
-            if (level.getGrid().getId(active.getX(), active.getY()-1) == ROCK) {
-                if (level.getGrid().getId(active.getX(), active.getY()-2) == ROCK) {
-                    neighbors.put(Direction2D.NORTH, new Tile2D(active.getX(), active.getY()-2, Direction2D.NORTH));
-                    passages.put(Direction2D.NORTH, new Tile2D(active.getX(), active.getY()-1, Direction2D.NORTH));
+            if (level.getGrid().get(active.getX(), active.getY()-1).getType() == CellType.ROCK) {
+                if (level.getGrid().get(active.getX(), active.getY()-2).getType() == CellType.ROCK) {
+                    neighbors.put(Direction2D.NORTH, new PrimsTile2D(active.getX(), active.getY()-2, Direction2D.NORTH));
+                    passages.put(Direction2D.NORTH, new PrimsTile2D(active.getX(), active.getY()-1, Direction2D.NORTH));
                 } else {
                     // ineligible space for neighbor, make the in-between as wall
-                    level.getGrid().setId(active.getX(), active.getY()-1, WALL);
+                    level.getGrid().get(active.getX(), active.getY()-1).setType(CellType.WALL);
                 }
 
             }
-            if (level.getGrid().getId(active.getX(), active.getY()+1) == ROCK) {
-                if (level.getGrid().getId(active.getX(), active.getY()+2) == ROCK) {
-                    neighbors.put(Direction2D.SOUTH, new Tile2D(active.getX(), active.getY() + 2, Direction2D.SOUTH));
-                    passages.put(Direction2D.SOUTH, new Tile2D(active.getX(), active.getY() + 1, Direction2D.SOUTH));
+            if (level.getGrid().get(active.getX(), active.getY()+1).getType() == CellType.ROCK) {
+                if (level.getGrid().get(active.getX(), active.getY()+2).getType() == CellType.ROCK) {
+                    neighbors.put(Direction2D.SOUTH, new PrimsTile2D(active.getX(), active.getY() + 2, Direction2D.SOUTH));
+                    passages.put(Direction2D.SOUTH, new PrimsTile2D(active.getX(), active.getY() + 1, Direction2D.SOUTH));
                 } else {
-                    level.getGrid().setId(active.getX(), active.getY()+1, WALL);
+                    level.getGrid().get(active.getX(), active.getY()+1).setType(CellType.WALL);
                 }
             }
-            if (level.getGrid().getId(active.getX()+1, active.getY()) == ROCK) {
-                if (level.getGrid().getId(active.getX()+2, active.getY()) == ROCK) {
-                    neighbors.put(Direction2D.EAST, new Tile2D(active.getX()+2, active.getY() , Direction2D.EAST));
-                    passages.put(Direction2D.EAST, new Tile2D(active.getX()+1, active.getY(), Direction2D.EAST));
+            if (level.getGrid().get(active.getX()+1, active.getY()).getType() == CellType.ROCK) {
+                if (level.getGrid().get(active.getX()+2, active.getY()).getType() == CellType.ROCK) {
+                    neighbors.put(Direction2D.EAST, new PrimsTile2D(active.getX()+2, active.getY() , Direction2D.EAST));
+                    passages.put(Direction2D.EAST, new PrimsTile2D(active.getX()+1, active.getY(), Direction2D.EAST));
                 } else {
-                    level.getGrid().setId(active.getX()+1, active.getY(), WALL);
+                    level.getGrid().get(active.getX()+1, active.getY()).setType(CellType.WALL);
                 }
             }
-            if (level.getGrid().getId(active.getX()-1, active.getY()) == ROCK) {
-                if (level.getGrid().getId(active.getX()-2, active.getY()) == ROCK) {
-                    neighbors.put(Direction2D.WEST, new Tile2D(active.getX() - 2, active.getY(), Direction2D.WEST));
-                    passages.put(Direction2D.WEST, new Tile2D(active.getX() - 1, active.getY(), Direction2D.WEST));
+            if (level.getGrid().get(active.getX()-1, active.getY()).getType() == CellType.ROCK) {
+                if (level.getGrid().get(active.getX()-2, active.getY()).getType() == CellType.ROCK) {
+                    neighbors.put(Direction2D.WEST, new PrimsTile2D(active.getX() - 2, active.getY(), Direction2D.WEST));
+                    passages.put(Direction2D.WEST, new PrimsTile2D(active.getX() - 1, active.getY(), Direction2D.WEST));
                 } else {
-                    level.getGrid().setId(active.getX()-1, active.getY(), WALL);
+                    level.getGrid().get(active.getX()-1, active.getY()).setType(CellType.WALL);
                 }
             }
 
@@ -826,8 +811,8 @@ public class MazeLevelGenerator2D {
                 continue;
             }
 
-            Tile2D selected = null;
-            Tile2D passage = null;
+            PrimsTile2D selected = null;
+            PrimsTile2D passage = null;
             // if available pick the same direction 80% of time
             if (random.nextDouble() < curveFactor && neighbors.containsKey(active.getDirection())) {
                 // move in the same direction as last time
@@ -858,18 +843,21 @@ public class MazeLevelGenerator2D {
 //            region.addTile(passage);
 
             // update grid with id of region
-            level.getGrid().setId(selected.getCoords(), region.getId().byteValue());
-            level.getGrid().setId(passage.getCoords(), region.getId().byteValue());
+            level.getGrid().get(selected.getCoords()).setRegionId(region.getId());
+            level.getGrid().get(selected.getCoords()).setType(CellType.CORRIDOR);
+
+            level.getGrid().get(passage.getCoords()).setRegionId(region.getId());
+            level.getGrid().get(passage.getCoords()).setType(CellType.CORRIDOR);
 
             // update sides of passage perpendicular to direction needs to turn into wall
             switch(passage.getDirection()) {
                 case NORTH, SOUTH -> {
-                    level.getGrid().setId(passage.getX()-1, passage.getY(), WALL);
-                    level.getGrid().setId(passage.getX()+1, passage.getY(), WALL);
+                    level.getGrid().get(passage.getX()-1, passage.getY()).setType(CellType.WALL);
+                    level.getGrid().get(passage.getX()+1, passage.getY()).setType(CellType.WALL);
                 }
                 case EAST, WEST -> {
-                    level.getGrid().setId(passage.getX(), passage.getY()-1, WALL);
-                    level.getGrid().setId(passage.getX(), passage.getY()+1, WALL);
+                    level.getGrid().get(passage.getX(), passage.getY()-1).setType(CellType.WALL);
+                    level.getGrid().get(passage.getX(), passage.getY()+1).setType(CellType.WALL);
                 }
             }
 
