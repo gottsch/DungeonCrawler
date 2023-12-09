@@ -89,6 +89,9 @@ public class MazeVisualizer2 extends Application {
 
         // number of rooms
         TextField numRoomsField = addField(pane, "# of Rooms:", 25);
+        // room dimension
+        TextField minRoomSize = addField(pane, "Min. Room Size:", 7);
+        TextField maxRoomSize = addField(pane, "Max. Room Size:", 19);
 
         TextField minCorridorRunField = addField(pane, "Min. Corridor Run:", 250);
         TextField maxCorridorRunField = addField(pane, "Max. Corridor Run:", 500);
@@ -120,6 +123,8 @@ public class MazeVisualizer2 extends Application {
                 generator.setWidth(Integer.valueOf(widthField.getText()));
                 generator.setHeight(Integer.valueOf(heightField.getText()));
                 generator.setNumberOfRooms(Integer.valueOf(numRoomsField.getText()));
+                generator.setMinSize(Integer.valueOf(minRoomSize.getText()));
+                generator.setMaxSize(Integer.valueOf(maxRoomSize.getText()));
                 generator.setMinCorridorSize(Integer.valueOf(minCorridorRunField.getText()));
                 generator.setMaxCorridorSize(Integer.valueOf(maxCorridorRunField.getText()));
                 generator.setRunFactor(Double.valueOf(runContinuationField.getText()));

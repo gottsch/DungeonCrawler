@@ -918,6 +918,22 @@ public class MazeLevelGenerator2D {
         this.numberOfRooms = numberOfRooms;
     }
 
+    public int getMinSize() {
+        return minSize;
+    }
+
+    public void setMinSize(int minSize) {
+        this.minSize = minSize;
+    }
+
+    public int getMaxSize() {
+        return maxSize;
+    }
+
+    public void setMaxSize(int maxSize) {
+        this.maxSize = maxSize;
+    }
+
     public double getCurveFactor() {
         return curveFactor;
     }
