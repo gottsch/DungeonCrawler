@@ -2,7 +2,6 @@ package dungoncrawler.visualizer;
 
 import dungoncrawler.generator.Coords2D;
 import dungoncrawler.generator.Rectangle2D;
-import dungoncrawler.generator._maze.room.IMazeRoom;
 import dungoncrawler.generator.maze.*;
 import javafx.application.Application;
 import javafx.event.ActionEvent;
@@ -16,7 +15,6 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.paint.Paint;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
@@ -86,19 +84,22 @@ public class MazeVisualizer2 extends Application {
 
         List<VBox> vBoxes = new ArrayList<>();
 
-        TextField widthField = addField(pane, "Width:", 95);
-        TextField heightField = addField(pane, "Height:", 95);
+        TextField widthField = addField(pane, "Width:", 65);
+        TextField heightField = addField(pane, "Height:", 65);
 
         // number of rooms
-        TextField numRoomsField = addField(pane, "# of Rooms:", 25);
+        TextField numRoomsField = addField(pane, "# of Rooms:", 35);
 
-        TextField minCorridorRunField = addField(pane, "Min. Corridor Run:", 250);
-        TextField maxCorridorRunField = addField(pane, "Max. Corridor Run:", 500);
+        TextField minCorridorRunField = addField(pane, "Min. Corridor Run:", 25);
+        TextField maxCorridorRunField = addField(pane, "Max. Corridor Run:", 50);
 
         TextField runContinuationField = addField(pane, "Run Continuation:", 0.8);
 
         // curve factor
         TextField curveFactorField = addField(pane, "Curve:", 0.8);
+
+        TextField fillAttemptsField = addField(pane, "Fill Attempts:", 3);
+        TextField fillRoomsPerSize = addField(pane, "Fill Rooms/Size:", 5);
 
         // buttons
 //        HBox buttonsBox = new HBox();
@@ -126,6 +127,9 @@ public class MazeVisualizer2 extends Application {
                 generator.setMaxCorridorSize(Integer.valueOf(maxCorridorRunField.getText()));
                 generator.setRunFactor(Double.valueOf(runContinuationField.getText()));
                 generator.setCurveFactor(Double.valueOf(curveFactorField.getText()));
+                generator.setFillAttempts(Integer.valueOf(fillAttemptsField.getText()));
+                generator.setFillRoomsPerSize(Integer.valueOf(fillRoomsPerSize.getText()));
+
                 Optional<ILevel2D> level = generator.generate();
                 buildMapPane(mapBox, level.orElseThrow());
             }
@@ -214,21 +218,22 @@ public class MazeVisualizer2 extends Application {
                 tile.setStrokeWidth(0.5);
                 Color color = null;
                 Color fillColor = null;
-                byte id = map.getId(x, y);
+                int id = map.get(x, y).getRegionId();
+                CellType cellType = map.get(x, y).getType();
                 // default outline color
                 color = Color.rgb(32, 32, 32);
-                if (id == MazeLevelGenerator2D.ROCK) {
+                if (cellType == CellType.ROCK) {
                     fillColor = Color.BLACK;
-                } else if (id == MazeLevelGenerator2D.WALL) {
+                } else if (cellType == CellType.WALL) {
                     // wall - beige
                     fillColor = Color.rgb(64, 64, 64); //Color.BLANCHEDALMOND;
-                } else if (id == MazeLevelGenerator2D.InternalIDs.CONNECTOR.getId()) {
+                } else if (cellType == CellType.CONNECTOR) {
                     fillColor = Color.rgb(64, 64, 64);
                     circle = new Circle((x * tileWidth) + (int) (tileWidth / 2), (y * tileHeight) + (int) (tileHeight / 2), 1);
                     circle.setStrokeWidth(0.5);
                     circle.setStroke(Color.WHITE);
                     circle.setFill(Color.WHITE);
-                } else if (id == MazeLevelGenerator2D.DOOR) {
+                } else if (cellType == CellType.DOOR) {
                     fillColor = Color.rgb(64, 64, 64);
                     // setup door
                     door = new Rectangle((x * tileWidth) + 2, (y * tileHeight) + 1, (int)(tileWidth /2), tileHeight -2);
