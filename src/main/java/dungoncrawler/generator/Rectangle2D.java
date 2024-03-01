@@ -71,16 +71,16 @@ public class Rectangle2D {
 	 * @return
 	 */
 	public boolean intersects(int x, int y, int w, int h) {
-		// NOTE changed from w <=0 and h <=0
+		// NOTE changed from w <=0 and h <=0, meaning sharing walls is allowed
 		if (isEmpty() || w < 0 || h < 0) {
 			return false;
 		}
-		double x0 = getOrigin().getX();
-		double y0 = getOrigin().getY();
-		return (x + w > x0 &&
-				y + h > y0 &&
-				x < x0 + getWidth() &&
-				y < y0 + getHeight());
+		double xOrigin = getOrigin().getX();
+		double yOrigin = getOrigin().getY();
+		return (x + w > xOrigin &&
+				y + h > yOrigin &&
+				x < xOrigin + getWidth() &&
+				y < yOrigin + getHeight());
 	}
 
 	/**

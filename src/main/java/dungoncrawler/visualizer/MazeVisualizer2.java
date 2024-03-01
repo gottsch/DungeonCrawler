@@ -84,22 +84,22 @@ public class MazeVisualizer2 extends Application {
 
         List<VBox> vBoxes = new ArrayList<>();
 
-        TextField widthField = addField(pane, "Width:", 95);
-        TextField heightField = addField(pane, "Height:", 95);
+        TextField widthField = addField(pane, "Width:", 65);
+        TextField heightField = addField(pane, "Height:", 65);
 
         // number of rooms
-        TextField numRoomsField = addField(pane, "# of Rooms:", 25);
-        // room dimension
-        TextField minRoomSize = addField(pane, "Min. Room Size:", 7);
-        TextField maxRoomSize = addField(pane, "Max. Room Size:", 19);
+        TextField numRoomsField = addField(pane, "# of Rooms:", 35);
 
-        TextField minCorridorRunField = addField(pane, "Min. Corridor Run:", 250);
-        TextField maxCorridorRunField = addField(pane, "Max. Corridor Run:", 500);
+        TextField minCorridorRunField = addField(pane, "Min. Corridor Run:", 25);
+        TextField maxCorridorRunField = addField(pane, "Max. Corridor Run:", 50);
 
         TextField runContinuationField = addField(pane, "Run Continuation:", 0.8);
 
         // curve factor
         TextField curveFactorField = addField(pane, "Curve:", 0.8);
+
+        TextField fillAttemptsField = addField(pane, "Fill Attempts:", 3);
+        TextField fillRoomsPerSize = addField(pane, "Fill Rooms/Size:", 5);
 
         // buttons
 //        HBox buttonsBox = new HBox();
@@ -123,12 +123,13 @@ public class MazeVisualizer2 extends Application {
                 generator.setWidth(Integer.valueOf(widthField.getText()));
                 generator.setHeight(Integer.valueOf(heightField.getText()));
                 generator.setNumberOfRooms(Integer.valueOf(numRoomsField.getText()));
-                generator.setMinSize(Integer.valueOf(minRoomSize.getText()));
-                generator.setMaxSize(Integer.valueOf(maxRoomSize.getText()));
                 generator.setMinCorridorSize(Integer.valueOf(minCorridorRunField.getText()));
                 generator.setMaxCorridorSize(Integer.valueOf(maxCorridorRunField.getText()));
                 generator.setRunFactor(Double.valueOf(runContinuationField.getText()));
                 generator.setCurveFactor(Double.valueOf(curveFactorField.getText()));
+                generator.setFillAttempts(Integer.valueOf(fillAttemptsField.getText()));
+                generator.setFillRoomsPerSize(Integer.valueOf(fillRoomsPerSize.getText()));
+
                 Optional<ILevel2D> level = generator.generate();
                 buildMapPane(mapBox, level.orElseThrow());
             }

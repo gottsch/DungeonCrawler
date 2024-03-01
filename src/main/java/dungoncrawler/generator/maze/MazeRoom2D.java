@@ -124,4 +124,16 @@ public class MazeRoom2D implements IRoom2D {
     public void setDoorways(List<Coords2D> doorways) {
         this.doorways = doorways;
     }
+
+    @Override
+    public String toString() {
+        return "MazeRoom2D{" +
+                "id=" + id +
+                ", box=" + box +
+                ", isStart=" + isStart +
+                ", isEnd=" + isEnd +
+                ", degrees=" + degrees +
+                ", doorways=" + doorways +
+                '}';
+    }
 }

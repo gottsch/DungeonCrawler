@@ -17,6 +17,10 @@ public class Grid2D {
         initialize(width, height);
     }
 
+    private Grid2D(Cell[][] cells) {
+        this.cells = cells.clone();
+    }
+
     private void initialize(int width, int height) {
 //        for (int x = 0; x < width; x++) {
 //            tiles[x][0] = 1;
@@ -37,12 +41,12 @@ public class Grid2D {
         }
     }
 
-    /**
-     *
-     * @param x
-     * @param y
-     * @return
-     */
+//    /**
+//     *
+//     * @param x
+//     * @param y
+//     * @return
+//     */
 //    public int getId(int x, int y) {
 //        return tiles[x][y];
 //    }
@@ -51,6 +55,22 @@ public class Grid2D {
 //        tiles[x][y] = id;
 //    }
 //
+
+    @JsonIgnore
+    public Coords2D getSize() {
+        return new Coords2D(cells.length, cells[0].length);
+    }
+
+    @JsonIgnore
+    public int getWidth() {
+        return cells.length;
+    }
+
+    @JsonIgnore
+    public int getHeight() {
+        return cells[0].length;
+    }
+
     @JsonIgnore
     public Cell get(Coords2D coords) {
         return cells[coords.getX()][coords.getY()];
@@ -90,5 +110,10 @@ public class Grid2D {
                 }
             }
         });
+    }
+
+    @Override
+    protected Grid2D clone() throws CloneNotSupportedException {
+        return new Grid2D(this.cells);
     }
 }
