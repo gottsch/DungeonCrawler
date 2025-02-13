@@ -9,6 +9,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  *
@@ -341,6 +343,8 @@ public class MazeLevelGenerator2D {
 //                    continue;
 //                }
 //            }
+
+            // TODO shouldn't be adding the room to the main room list yet. this is just generating rooms
             rooms.add(room);
             roomCount++;
 
@@ -400,21 +404,25 @@ public class MazeLevelGenerator2D {
         }
 
         for (int fillAttemptIndex = 0; fillAttemptIndex < this.fillAttempts; fillAttemptIndex++) {
+            LOGGER.debug("attempt # -> {}", fillAttemptIndex);
             List<IRoom2D> rooms = new ArrayList<>();
             // scan the void grid looking for empty space candidates
             List<Rectangle2D> maximalRectangleList = getMaximalRectangles(voidGrid);
-
+            LOGGER.debug("size of rectangles -> {}", maximalRectangleList.size());
             // randomize the sort of the list
             Collections.shuffle(maximalRectangleList);
-
+            LOGGER.debug("size of supplied rooms -> {}", suppliedRooms.size());
             // for each of the supplied rooms
             suppliedRooms.forEach(suppliedRoom -> {
                 // a list to manage the rectangles to remove
                 List<Rectangle2D> rectangleRemoveList = new ArrayList<>();
                 // get the size of the room
                 Coords2D size = new Coords2D(suppliedRoom.getWidth(), suppliedRoom.getHeight());
+                LOGGER.debug("testing room -> {}, size -> {}", suppliedRoom.getId(), size);
+                LOGGER.debug("size of rectangles2 -> {}", maximalRectangleList.size());
                 // scan all the rectangles
                 for (Rectangle2D r : maximalRectangleList) {
+                    LOGGER.debug("testing against rectangle -> {}x{}", r.getWidth(), r.getHeight());
                     if (size.getX() <= r.getWidth() && size.getY() <= r.getHeight()) {
                         // find the delta of x,y between size and r
                         int dx = r.getWidth() - size.getX();
@@ -442,7 +450,12 @@ public class MazeLevelGenerator2D {
 
                         LOGGER.debug("adding fill room -> {}", suppliedRoom);
 
-                        // add rectangle to the remove list
+                        // add all intersecting rectangle to the remove list
+//                        for (Rectangle2D r2 : maximalRectangleList) {
+//                            if (r2.intersects(suppliedRoom.getBox())) {
+//                                rectangleRemoveList.add(r2);
+//                            }
+//                        }
                         rectangleRemoveList.add(r);
                         break;
                     }
@@ -454,6 +467,7 @@ public class MazeLevelGenerator2D {
                     }
                 }
 
+                // remove intersecting rectangles
                 maximalRectangleList.removeAll(rectangleRemoveList);
                 rectangleRemoveList.clear();
             });
@@ -464,6 +478,7 @@ public class MazeLevelGenerator2D {
             rooms.clear();
         }
 
+        LOGGER.debug("size of added rooms -> {}", newRooms.size());
         return newRooms;
     }
 
@@ -948,13 +963,13 @@ public class MazeLevelGenerator2D {
     private boolean cullRegionsConnectors(ILevel2D level, Map<Integer, IRoom2D> roomMap, MazeRegion2D region1, MazeRegion2D region2) {
         boolean shouldMoveToNextConnector = false;
         for (MazeRegion2D region : Arrays.asList(region1, region2)) {
-            LOGGER.debug("region -> {} of type -> {}", region.getId(), region.getType());
+//            LOGGER.debug("region -> {} of type -> {}", region.getId(), region.getType());
             if (region.getType() == MazeRegionType.ROOM) {
                 IRoom2D room = roomMap.get(region.getId());
-                LOGGER.debug("room -> {} has degrees -> {} and doors -> {}", room.getId(), room.getDegrees(), room.getDoorways().size());
+//                LOGGER.debug("room -> {} has degrees -> {} and doors -> {}", room.getId(), room.getDegrees(), room.getDoorways().size());
 
                 if (room.getDoorways().size() >= room.getDegrees()) {
-                    LOGGER.debug("room -> {} has met its degrees. moving to next connector.", room.getId());
+//                    LOGGER.debug("room -> {} has met its degrees. moving to next connector.", room.getId());
                     cullRegionConnectors(level, region.getId());
                     shouldMoveToNextConnector = true;
                 }
@@ -1073,12 +1088,12 @@ public class MazeLevelGenerator2D {
         // update the rooms
         IRoom2D room = roomMap.get(connector.getRegion1().getId());
         if (room != null) {
-            LOGGER.debug("add door to room -> {} at -> {}", room.getId(), connector.getCoords());
+//            LOGGER.debug("add door to room -> {} at -> {}", room.getId(), connector.getCoords());
             room.getDoorways().add(connector.getCoords());
         }
         room = roomMap.get(connector.getRegion2().getId());
         if (room != null) {
-            LOGGER.debug("add door to room -> {} at -> {}", room.getId(), connector.getCoords());
+//            LOGGER.debug("add door to room -> {} at -> {}", room.getId(), connector.getCoords());
             room.getDoorways().add(connector.getCoords());
         }
     }
@@ -1089,8 +1104,18 @@ public class MazeLevelGenerator2D {
      * @param startCoords
      */
     private void prims(ILevel2D level, Coords2D startCoords) {
+        // a list of tiles that need to be evaluated for corridor
         List<PrimsTile2D> activeList = new ArrayList<>();
+        /*
+         * the cell that is +2 away from active or the neighbor of the active cell.
+         * it has to be +2 because that is the next valid position for an active cell, because
+         * one cell width is used for a wall. a wall has to separate the corridors.
+         */
         Map<Direction2D, PrimsTile2D> neighbors = new HashMap<>();
+        /*
+         * the cell that is +1 or adjacent to active - the connector between active and neighbor and
+         * perpendicularly connected to walls.
+         */
         Map<Direction2D, PrimsTile2D> passages = new HashMap<>();
         int maxRun = random.nextInt(maxCorridorSize - minCorridorSize) + minCorridorSize;
         // create tile
@@ -1207,15 +1232,49 @@ public class MazeLevelGenerator2D {
             level.getGrid().get(passage.getCoords()).setRegionId(region.getId());
             level.getGrid().get(passage.getCoords()).setType(CellType.CORRIDOR);
 
+//            Cell passageCell = level.getGrid().get(passage.getCoords());
+
             // update sides of passage perpendicular to direction needs to turn into wall
             switch(passage.getDirection()) {
                 case NORTH, SOUTH -> {
                     level.getGrid().get(passage.getX()-1, passage.getY()).setType(CellType.WALL);
                     level.getGrid().get(passage.getX()+1, passage.getY()).setType(CellType.WALL);
+/*
+ NOTE I don't know what I was trying to accomplish here, but this really messes up the passages
+ */
+
+//                    // check the far sides of walls for same region
+//                    if (passage.getX()-2 > 0 && level.getGrid().get(passage.getX() - 2, passage.getY()).getType() == CellType.CORRIDOR && level.getGrid().get(passage.getX() - 2, passage.getY()).getRegionId() == passageCell.getRegionId()) {
+//                        level.getGrid().get(passage.getX() - 1, passage.getY()).setRegionId(passageCell.getRegionId());
+//                        level.getGrid().get(passage.getX() - 1, passage.getY()).setType(CellType.CORRIDOR);
+//                    } else {
+//                        level.getGrid().get(passage.getX() - 1, passage.getY()).setType(CellType.WALL);
+//                    }
+//
+//                    if (passage.getX()+2 < getWidth() && level.getGrid().get(passage.getX() + 2, passage.getY()).getType() == CellType.CORRIDOR && level.getGrid().get(passage.getX() + 2, passage.getY()).getRegionId() == passageCell.getRegionId()) {
+//                        level.getGrid().get(passage.getX() + 1, passage.getY()).setRegionId(passageCell.getRegionId());
+//                        level.getGrid().get(passage.getX() + 1, passage.getY()).setType(CellType.CORRIDOR);
+//                    } else {
+//                        level.getGrid().get(passage.getX() + 1, passage.getY()).setType(CellType.WALL);
+//                    }
                 }
                 case EAST, WEST -> {
                     level.getGrid().get(passage.getX(), passage.getY()-1).setType(CellType.WALL);
                     level.getGrid().get(passage.getX(), passage.getY()+1).setType(CellType.WALL);
+
+//                    if(passage.getY()-2 > 0 && level.getGrid().get(passage.getX(), passage.getY()-2).getType() == CellType.CORRIDOR && level.getGrid().get(passage.getX(), passage.getY()-2).getRegionId() == passageCell.getRegionId()) {
+//                        level.getGrid().get(passage.getX(), passage.getY() - 1).setRegionId(passageCell.getRegionId());
+//                        level.getGrid().get(passage.getX(), passage.getY() - 1).setType(CellType.CORRIDOR);
+//                    } else {
+//                        level.getGrid().get(passage.getX(), passage.getY() - 1).setType(CellType.WALL);
+//                    }
+//
+//                    if (passage.getY()+2 < getHeight() && level.getGrid().get(passage.getX(), passage.getY()+2).getType() == CellType.CORRIDOR && level.getGrid().get(passage.getX(), passage.getY()+2).getRegionId() == passageCell.getRegionId()) {
+//                        level.getGrid().get(passage.getX(), passage.getY() + 1).setRegionId(passageCell.getRegionId());
+//                        level.getGrid().get(passage.getX(), passage.getY() + 1).setType(CellType.CORRIDOR);
+//                    } else {
+//                        level.getGrid().get(passage.getX(), passage.getY() + 1).setType(CellType.WALL);
+//                    }
                 }
             }
 

@@ -41,11 +41,11 @@ public class MazeVisualizer2 extends Application {
 
     MazeLevelGenerator2D generator = new MazeLevelGenerator2D.Builder()
             .with($ -> {
-                $.width = 95;
-                $.height = 95;
-                $.minSize = 7;
+                $.width = 65;
+                $.height = 65;
+                $.minSize = 5;
                 $.maxSize = 19;
-                $.attemptsMax = 2000;
+                $.attemptsMax = 1000;
                 $.meanFactor = 0.80;
             }).build();
 
